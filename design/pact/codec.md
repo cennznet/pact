@@ -3,7 +3,7 @@ The pact binary format is 1 version byte, followed by static data section and tr
 `version | datatable | bytecode` or formally,  
 ```
 version:   1 LE byte
-datatable: _l_ x PactType
+datatable: DataTable (see datatable codec)
 bytecode:  remaining LE bytes
 ```
 
