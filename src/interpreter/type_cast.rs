@@ -19,48 +19,39 @@ impl<'a> AnyTryInto<'a> for PactType<'a> {
     fn any_try_into(value: &'a dyn Any) -> Result<PactType<'a>, PactConversionErr> {
         // TODO: refactor the below repetiion using macros
         // Unsigned integer type casting into PactType
-        if value.is::<u8>()
-            || value.is::<u16>()
-            || value.is::<u32>()
-            || value.is::<u64>()
-            || value.is::<u128>()
-        {
-            if let Some(number) = value.downcast_ref::<u8>() {
-                if let Ok(n) = u64::try_from(*number) {
-                    return Ok(PactType::Numeric(Numeric(n)));
-                }
+        if let Some(number) = value.downcast_ref::<u8>() {
+            if let Ok(n) = u64::try_from(*number) {
+                return Ok(PactType::Numeric(Numeric(n)));
             }
-            if let Some(number) = value.downcast_ref::<u16>() {
-                if let Ok(n) = u64::try_from(*number) {
-                    return Ok(PactType::Numeric(Numeric(n)));
-                }
+        }
+        if let Some(number) = value.downcast_ref::<u16>() {
+            if let Ok(n) = u64::try_from(*number) {
+                return Ok(PactType::Numeric(Numeric(n)));
             }
-            if let Some(number) = value.downcast_ref::<u32>() {
-                if let Ok(n) = u64::try_from(*number) {
-                    return Ok(PactType::Numeric(Numeric(n)));
-                }
+        }
+        if let Some(number) = value.downcast_ref::<u32>() {
+            if let Ok(n) = u64::try_from(*number) {
+                return Ok(PactType::Numeric(Numeric(n)));
             }
-            if let Some(number) = value.downcast_ref::<u64>() {
-                return Ok(PactType::Numeric(Numeric(*number)));
+        }
+        if let Some(number) = value.downcast_ref::<u64>() {
+            return Ok(PactType::Numeric(Numeric(*number)));
+        }
+        if let Some(number) = value.downcast_ref::<u128>() {
+            if *number > core::u64::MAX as u128 {
+                return Err(PactConversionErr::Overflow);
             }
-            if let Some(number) = value.downcast_ref::<u128>() {
-                if *number > core::u64::MAX as u128 {
-                    return Err(PactConversionErr::Overflow);
-                }
-                if let Ok(n) = u64::try_from(*number) {
-                    return Ok(PactType::Numeric(Numeric(n)));
-                }
+            if let Ok(n) = u64::try_from(*number) {
+                return Ok(PactType::Numeric(Numeric(n)));
             }
         }
 
         // String-like type casting into PactType
-        if value.is::<&str>() || value.is::<String>() {
-            if let Some(string) = value.downcast_ref::<&str>() {
-                return Ok(PactType::StringLike(StringLike(&*string.as_bytes())));
-            }
-            if let Some(string) = value.downcast_ref::<String>() {
-                return Ok(PactType::StringLike(StringLike(string.as_bytes())));
-            }
+        if let Some(string) = value.downcast_ref::<&str>() {
+            return Ok(PactType::StringLike(StringLike(&*string.as_bytes())));
+        }
+        if let Some(string) = value.downcast_ref::<String>() {
+            return Ok(PactType::StringLike(StringLike(string.as_bytes())));
         }
 
         // Unhandled Type
