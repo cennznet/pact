@@ -1,6 +1,7 @@
 use crate::interpreter::types::{Numeric, PactType, StringLike};
-use std::any::Any;
-use std::convert::TryFrom;
+use core::any::Any;
+use core::convert::TryFrom;
+use std::string::String;
 
 #[derive(Debug, PartialEq)]
 pub enum PactConversionErr {
@@ -43,7 +44,7 @@ impl<'a> AnyTryInto<'a> for PactType<'a> {
                 return Ok(PactType::Numeric(Numeric(*number)));
             }
             if let Some(number) = value.downcast_ref::<u128>() {
-                if *number > std::u64::MAX as u128 {
+                if *number > core::u64::MAX as u128 {
                     return Err(PactConversionErr::Overflow);
                 }
                 if let Ok(n) = u64::try_from(*number) {
@@ -84,7 +85,7 @@ mod tests {
 
         // Assertion for overflow
         assert_eq!(
-            PactType::any_try_into(&(std::u64::MAX as u128 + 2)),
+            PactType::any_try_into(&(core::u64::MAX as u128 + 2)),
             Err(PactConversionErr::Overflow),
         );
     }

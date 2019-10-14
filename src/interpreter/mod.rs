@@ -14,11 +14,9 @@
 //!
 //! The pact bytecode interpreter
 //!
+pub mod type_cast;
 pub mod types;
 use types::PactType;
-
-#[cfg(feature = "std")]
-pub mod type_cast;
 
 // OpCode masks
 const OP_MASK: u8 = 0b0011_1111;
