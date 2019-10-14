@@ -4,7 +4,6 @@ use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub enum PactConversionErr {
-    NegativeInteger,
     Overflow,
     UnknownType,
 }
@@ -18,58 +17,6 @@ pub trait AnyTryInto<'a>: Sized {
 impl<'a> AnyTryInto<'a> for PactType<'a> {
     fn any_try_into(value: &'a dyn Any) -> Result<PactType<'a>, PactConversionErr> {
         // TODO: refactor the below repetiion using macros
-        // Signed integer type casting into PactType
-        if value.is::<i8>()
-            || value.is::<i16>()
-            || value.is::<i32>()
-            || value.is::<i64>()
-            || value.is::<i128>()
-        {
-            if let Some(number) = value.downcast_ref::<i8>() {
-                if *number < 0 {
-                    return Err(PactConversionErr::NegativeInteger);
-                }
-                if let Ok(n) = u64::try_from(*number) {
-                    return Ok(PactType::Numeric(Numeric(n)));
-                }
-            }
-            if let Some(number) = value.downcast_ref::<i16>() {
-                if *number < 0 {
-                    return Err(PactConversionErr::NegativeInteger);
-                }
-                if let Ok(n) = u64::try_from(*number) {
-                    return Ok(PactType::Numeric(Numeric(n)));
-                }
-            }
-            if let Some(number) = value.downcast_ref::<i32>() {
-                if *number < 0 {
-                    return Err(PactConversionErr::NegativeInteger);
-                }
-                if let Ok(n) = u64::try_from(*number) {
-                    return Ok(PactType::Numeric(Numeric(n)));
-                }
-            }
-            if let Some(number) = value.downcast_ref::<i64>() {
-                if *number < 0 {
-                    return Err(PactConversionErr::NegativeInteger);
-                }
-                if let Ok(n) = u64::try_from(*number) {
-                    return Ok(PactType::Numeric(Numeric(n)));
-                }
-            }
-            if let Some(number) = value.downcast_ref::<i128>() {
-                if *number < 0 {
-                    return Err(PactConversionErr::NegativeInteger);
-                }
-                if *number > std::u64::MAX as i128 {
-                    return Err(PactConversionErr::Overflow);
-                }
-                if let Ok(n) = u64::try_from(*number) {
-                    return Ok(PactType::Numeric(Numeric(n)));
-                }
-            }
-        }
-
         // Unsigned integer type casting into PactType
         if value.is::<u8>()
             || value.is::<u16>()
@@ -127,25 +74,15 @@ mod tests {
     #[test]
     fn it_converts_numeric() {
         assert_eq!(
-            PactType::any_try_into(&0_i8),
+            PactType::any_try_into(&0_u8),
             Ok(PactType::Numeric(Numeric(0))),
         );
         assert_eq!(
-            PactType::any_try_into(&1_i128),
+            PactType::any_try_into(&1_u128),
             Ok(PactType::Numeric(Numeric(1))),
         );
 
-        // Assertion for negative integer
-        assert_eq!(
-            PactType::any_try_into(&-10_i8),
-            Err(PactConversionErr::NegativeInteger),
-        );
-
         // Assertion for overflow
-        assert_eq!(
-            PactType::any_try_into(&(std::u64::MAX as i128 + 1)),
-            Err(PactConversionErr::Overflow),
-        );
         assert_eq!(
             PactType::any_try_into(&(std::u64::MAX as u128 + 2)),
             Err(PactConversionErr::Overflow),
