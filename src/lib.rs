@@ -29,6 +29,9 @@ pub mod interpreter;
 pub use interpreter::types;
 
 #[cfg(feature = "std")]
+pub use interpreter::type_cast;
+
+#[cfg(feature = "std")]
 pub mod compiler;
 
 #[cfg(feature = "std")]

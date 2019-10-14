@@ -17,6 +17,7 @@
 pub mod types;
 use types::PactType;
 
+#[cfg(feature = "std")]
 pub mod type_cast;
 
 // OpCode masks

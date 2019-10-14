@@ -1,4 +1,4 @@
-use crate::types::{Numeric, PactType, StringLike};
+use crate::interpreter::types::{Numeric, PactType, StringLike};
 use std::any::Any;
 use std::convert::TryFrom;
 
@@ -10,7 +10,7 @@ pub enum PactConversionErr {
 }
 
 /// A catch-all conversion trait which tries to turn any given `value` into the implementing type
-trait AnyTryInto<'a>: Sized {
+pub trait AnyTryInto<'a>: Sized {
     fn any_try_into(value: &'a dyn Any) -> Result<Self, PactConversionErr>;
 }
 
