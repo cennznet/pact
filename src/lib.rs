@@ -12,7 +12,6 @@
 // limitations under the License.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![feature(specialization)]
 
 // 'std' is required for parser and compilation
 // interpreter can execute in `no_std` environment
