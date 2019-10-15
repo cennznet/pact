@@ -18,7 +18,7 @@ pub trait AnyTryInto<'a>: Sized {
 /// AnyTryInto implementation for PactType
 impl<'a> AnyTryInto<'a> for PactType<'a> {
     fn any_try_into(value: &'a dyn Any) -> Result<PactType<'a>, PactConversionErr> {
-        // TODO: refactor the below repetiion using macros
+        // TODO: refactor the below repetition using macros
         // Unsigned integer type casting into PactType
         if let Some(number) = value.downcast_ref::<u8>() {
             return Ok(PactType::Numeric(Numeric(*number as u64)));
