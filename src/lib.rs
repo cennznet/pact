@@ -26,10 +26,8 @@ extern crate pest;
 extern crate pest_derive;
 
 pub mod interpreter;
-pub use interpreter::types;
-
-#[cfg(feature = "std")]
 pub use interpreter::type_cast;
+pub use interpreter::types;
 
 #[cfg(feature = "std")]
 pub mod compiler;
