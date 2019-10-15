@@ -14,6 +14,7 @@
 //!
 //! The pact bytecode interpreter
 //!
+pub mod type_cast;
 pub mod types;
 use types::PactType;
 
@@ -21,7 +22,7 @@ use types::PactType;
 const OP_MASK: u8 = 0b0011_1111;
 
 /// Interpret some pact byte code (`source`) with input data registers (`input_data`) and
-/// user data registers (`user_data`).  
+/// user data registers (`user_data`).
 /// Returns a boolean indicating whether the pact contract was validated or not,
 /// An InterpErr is returned on a runtime error e.g. malformed byte code, missing data, invalid OpCode etc.
 pub fn interpret(
@@ -74,7 +75,7 @@ pub enum InterpErr {
 
 /// A pact instruction code
 ///
-/// Big Endian OpCodes  
+/// Big Endian OpCodes
 /// - 6 bit OpCode index
 /// - 1 bit reserved
 /// - 1 bit reserved
@@ -166,7 +167,7 @@ impl OpCode {
     }
 }
 
-/// Convert an OpCode into its u8 index.  
+/// Convert an OpCode into its u8 index.
 /// It does not encode any following parameters
 impl Into<u8> for OpCode {
     fn into(self) -> u8 {
@@ -226,7 +227,7 @@ fn eval_conjunction(op: OpCode, lhs: bool, rhs: bool) -> Result<bool, InterpErr>
 /// The pact interpreter
 /// It evaluates `OpCode`s maintaining the state of the current contract execution
 /// Uses the rust type system to encode state, see: https://hoverbear.org/2016/10/12/rust-state-machine-pattern/
-/// States provide transformations into other valid states and failure cases.  
+/// States provide transformations into other valid states and failure cases.
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct Interpreter<'a> {
     state: State<'a>,

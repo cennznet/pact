@@ -14,6 +14,7 @@
 //!
 //! Primitive types in the pact interpreter.
 //!
+pub use crate::interpreter::type_cast::AnyTryInto;
 use bit_reverse::ParallelReverse;
 use std::vec::Vec;
 
