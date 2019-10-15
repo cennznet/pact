@@ -21,30 +21,21 @@ impl<'a> AnyTryInto<'a> for PactType<'a> {
         // TODO: refactor the below repetiion using macros
         // Unsigned integer type casting into PactType
         if let Some(number) = value.downcast_ref::<u8>() {
-            if let Ok(n) = u64::try_from(*number) {
-                return Ok(PactType::Numeric(Numeric(n)));
-            }
+            return Ok(PactType::Numeric(Numeric(*number as u64)));
         }
         if let Some(number) = value.downcast_ref::<u16>() {
-            if let Ok(n) = u64::try_from(*number) {
-                return Ok(PactType::Numeric(Numeric(n)));
-            }
+            return Ok(PactType::Numeric(Numeric(*number as u64)));
         }
         if let Some(number) = value.downcast_ref::<u32>() {
-            if let Ok(n) = u64::try_from(*number) {
-                return Ok(PactType::Numeric(Numeric(n)));
-            }
+            return Ok(PactType::Numeric(Numeric(*number as u64)));
         }
         if let Some(number) = value.downcast_ref::<u64>() {
             return Ok(PactType::Numeric(Numeric(*number)));
         }
         if let Some(number) = value.downcast_ref::<u128>() {
-            if *number > core::u64::MAX as u128 {
-                return Err(PactConversionErr::Overflow);
-            }
-            if let Ok(n) = u64::try_from(*number) {
-                return Ok(PactType::Numeric(Numeric(n)));
-            }
+            return Ok(PactType::Numeric(Numeric(
+                u64::try_from(*number).map_err(|_| PactConversionErr::Overflow)?,
+            )));
         }
 
         // String-like type casting into PactType
