@@ -18,19 +18,15 @@ pub trait IntoPact<'a, I> {
     fn into_pact(self) -> PactType<'a>;
 }
 
-/// Dummy structs
-struct Numbers;
-struct Strings;
-
 /// Impl for all types that implement lossless conversion into u64
-impl<'a, T: Into<u64> + Copy> IntoPact<'a, &Numbers> for T {
+impl<'a, T: Into<u64> + Copy> IntoPact<'a, &T> for T {
     fn into_pact(self) -> PactType<'a> {
         PactType::Numeric(Numeric(Into::<u64>::into(self)))
     }
 }
 
 /// Impl for all types that can be converted to &[u8]
-impl<'a, T: AsRef<[u8]> + ?Sized> IntoPact<'a, &Strings> for &'a T {
+impl<'a, T: AsRef<[u8]> + ?Sized> IntoPact<'a, &T> for &'a T {
     fn into_pact(self) -> PactType<'a> {
         PactType::StringLike(StringLike(self.as_ref()))
     }
