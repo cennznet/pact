@@ -46,6 +46,7 @@ mod tests {
             (1_u16.into_pact(), Ok(PactType::Numeric(Numeric(1)))),
             (2_u32.into_pact(), Ok(PactType::Numeric(Numeric(2)))),
             (3_u64.into_pact(), Ok(PactType::Numeric(Numeric(3)))),
+            (4_u128.into_pact(), Ok(PactType::Numeric(Numeric(4)))),
         ];
         for (lhs, rhs) in tests {
             assert_eq!(lhs, rhs);
