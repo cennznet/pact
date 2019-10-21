@@ -12,94 +12,30 @@
 // limitations under the License.
 
 use crate::interpreter::types::{Numeric, PactType, StringLike};
-use core::any::Any;
-use core::convert::TryFrom;
-use std::string::String;
-use std::vec::Vec;
 
-#[derive(Debug, PartialEq)]
-pub enum PactConversionErr {
-    Overflow,
-    UnknownType,
+/// A blanket trait for conversion into PactType
+pub trait IntoPact<'a, I> {
+    fn into_pact(self) -> PactType<'a>;
 }
 
-/// A catch-all conversion trait which tries to turn any given `value` into the implementing type
-pub trait AnyTryInto<'a>: Sized {
-    fn any_try_into(value: &'a dyn Any) -> Result<Self, PactConversionErr>;
-}
+/// Dummy structs
+struct Numbers;
+struct Strings;
 
-/// AnyTryInto implementation for PactType
-impl<'a> AnyTryInto<'a> for PactType<'a> {
-    fn any_try_into(value: &'a dyn Any) -> Result<PactType<'a>, PactConversionErr> {
-        // TODO: refactor the below repetition using macros
-        // Unsigned integer type casting into PactType
-        if let Some(number) = value.downcast_ref::<u8>() {
-            return Ok(PactType::Numeric(Numeric(*number as u64)));
-        }
-        if let Some(number) = value.downcast_ref::<u16>() {
-            return Ok(PactType::Numeric(Numeric(*number as u64)));
-        }
-        if let Some(number) = value.downcast_ref::<u32>() {
-            return Ok(PactType::Numeric(Numeric(*number as u64)));
-        }
-        if let Some(number) = value.downcast_ref::<u64>() {
-            return Ok(PactType::Numeric(Numeric(*number)));
-        }
-        if let Some(number) = value.downcast_ref::<u128>() {
-            return Ok(PactType::Numeric(Numeric(
-                u64::try_from(*number).map_err(|_| PactConversionErr::Overflow)?,
-            )));
-        }
-
-        // String-like type casting into PactType
-        if let Some(string) = value.downcast_ref::<&str>() {
-            return Ok(PactType::StringLike(StringLike(&*string.as_bytes())));
-        }
-        if let Some(string) = value.downcast_ref::<String>() {
-            return Ok(PactType::StringLike(StringLike(string.as_bytes())));
-        }
-        if let Some(string) = value.downcast_ref::<Vec<u8>>() {
-            return Ok(PactType::StringLike(StringLike(&*string)));
-        }
-
-        // Fixed hash type casting into PactType
-        if let Some(string) = value.downcast_ref::<[u8; 4]>() {
-            return Ok(PactType::StringLike(StringLike(&*string))); // H32
-        }
-        if let Some(string) = value.downcast_ref::<[u8; 8]>() {
-            return Ok(PactType::StringLike(StringLike(&*string))); // H64
-        }
-        if let Some(string) = value.downcast_ref::<[u8; 16]>() {
-            return Ok(PactType::StringLike(StringLike(&*string))); // H128
-        }
-        if let Some(string) = value.downcast_ref::<[u8; 20]>() {
-            return Ok(PactType::StringLike(StringLike(&*string))); // H160
-        }
-        if let Some(string) = value.downcast_ref::<[u8; 32]>() {
-            return Ok(PactType::StringLike(StringLike(&*string))); // H256
-        }
-        if let Some(string) = value.downcast_ref::<[u8; 33]>() {
-            return Ok(PactType::StringLike(StringLike(&*string))); // H264
-        }
-        if let Some(string) = value.downcast_ref::<[u8; 64]>() {
-            return Ok(PactType::StringLike(StringLike(&*string))); // H512
-        }
-        if let Some(string) = value.downcast_ref::<[u8; 65]>() {
-            return Ok(PactType::StringLike(StringLike(&*string))); // H520
-        }
-        if let Some(string) = value.downcast_ref::<[u8; 128]>() {
-            return Ok(PactType::StringLike(StringLike(&*string))); // H1024
-        }
-        if let Some(string) = value.downcast_ref::<[u8; 256]>() {
-            return Ok(PactType::StringLike(StringLike(&*string))); // H2048
-        }
-
-        // Unhandled Type
-        Err(PactConversionErr::UnknownType)
+/// Impl for all types that implement lossless conversion into u64
+impl<'a, T: Into<u64> + Copy> IntoPact<'a, &Numbers> for T {
+    fn into_pact(self) -> PactType<'a> {
+        PactType::Numeric(Numeric(Into::<u64>::into(self)))
     }
 }
 
-#[rustfmt::skip]
+/// Impl for all types that can be converted to &[u8]
+impl<'a, T: AsRef<[u8]> + ?Sized> IntoPact<'a, &Strings> for &'a T {
+    fn into_pact(self) -> PactType<'a> {
+        PactType::StringLike(StringLike(self.as_ref()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,43 +43,25 @@ mod tests {
     #[test]
     fn it_converts_numeric() {
         let tests = vec![
-            (PactType::any_try_into(&0_u8),   Ok(PactType::Numeric(Numeric(0)))),
-            (PactType::any_try_into(&1_u16),  Ok(PactType::Numeric(Numeric(1)))),
-            (PactType::any_try_into(&2_u32),  Ok(PactType::Numeric(Numeric(2)))),
-            (PactType::any_try_into(&3_u64),  Ok(PactType::Numeric(Numeric(3)))),
-            (PactType::any_try_into(&4_u128), Ok(PactType::Numeric(Numeric(4)))),
+            (0_u8.into_pact(), PactType::Numeric(Numeric(0))),
+            (1_u16.into_pact(), PactType::Numeric(Numeric(1))),
+            (2_u32.into_pact(), PactType::Numeric(Numeric(2))),
+            (3_u64.into_pact(), PactType::Numeric(Numeric(3))),
         ];
         for (lhs, rhs) in tests {
             assert_eq!(lhs, rhs);
         }
-
-        // Assertion for overflow
-        assert_eq!(
-            PactType::any_try_into(&(core::u64::MAX as u128 + 2)),
-            Err(PactConversionErr::Overflow),
-        );
     }
 
     #[test]
     fn it_converts_string_like() {
         assert_eq!(
-            PactType::any_try_into(&"test"),
-            Ok(PactType::StringLike(StringLike(b"test"))),
-        );
-        assert_eq!(
-            PactType::any_try_into(&'a'.to_string()),
-            Ok(PactType::StringLike(StringLike(b"a"))),
-        );
-        assert_eq!(
-            PactType::any_try_into(&"test".to_string()),
-            Ok(PactType::StringLike(StringLike(b"test"))),
+            "test".into_pact(),
+            PactType::StringLike(StringLike(b"test")),
         );
 
         let v: Vec<u8> = vec![116, 101, 115, 116];
-        assert_eq!(
-            PactType::any_try_into(&v),
-            Ok(PactType::StringLike(StringLike(b"test")))
-        );
+        assert_eq!(v.into_pact(), PactType::StringLike(StringLike(b"test")),);
 
         // Assertion for fixed hash types
         let h32 = b"0x01";
@@ -156,14 +74,14 @@ mod tests {
         let h520 = b"0x012345678910111213141516171819202122232425262728293031323334353";
 
         let tests = vec![
-            (PactType::any_try_into(h32),  Ok(PactType::StringLike(StringLike(h32)))),
-            (PactType::any_try_into(h64),  Ok(PactType::StringLike(StringLike(h64)))),
-            (PactType::any_try_into(h128), Ok(PactType::StringLike(StringLike(h128)))),
-            (PactType::any_try_into(h160), Ok(PactType::StringLike(StringLike(h160)))),
-            (PactType::any_try_into(h256), Ok(PactType::StringLike(StringLike(h256)))),
-            (PactType::any_try_into(h264), Ok(PactType::StringLike(StringLike(h264)))),
-            (PactType::any_try_into(h512), Ok(PactType::StringLike(StringLike(h512)))),
-            (PactType::any_try_into(h520), Ok(PactType::StringLike(StringLike(h520)))),
+            (h32.into_pact(), PactType::StringLike(StringLike(h32))),
+            (h64.into_pact(), PactType::StringLike(StringLike(h64))),
+            (h128.into_pact(), PactType::StringLike(StringLike(h128))),
+            (h160.into_pact(), PactType::StringLike(StringLike(h160))),
+            (h256.into_pact(), PactType::StringLike(StringLike(h256))),
+            (h264.into_pact(), PactType::StringLike(StringLike(h264))),
+            (h512.into_pact(), PactType::StringLike(StringLike(h512))),
+            (h520.into_pact(), PactType::StringLike(StringLike(h520))),
         ];
         for (lhs, rhs) in tests {
             assert_eq!(lhs, rhs);
@@ -188,8 +106,8 @@ mod tests {
         let n64: <Bar as Foo>::Number64 = 20u64;
 
         let tests = vec![
-            (PactType::any_try_into(&n32), Ok(PactType::Numeric(Numeric(10)))),
-            (PactType::any_try_into(&n64), Ok(PactType::Numeric(Numeric(20)))),
+            (n32.into_pact(), PactType::Numeric(Numeric(10))),
+            (n64.into_pact(), PactType::Numeric(Numeric(20))),
         ];
         for (lhs, rhs) in tests {
             assert_eq!(lhs, rhs);
@@ -217,9 +135,9 @@ mod tests {
         let s3: <Bar as Foo>::Str = "test3".to_string();
 
         let tests = vec![
-            (PactType::any_try_into(&s1), Ok(PactType::StringLike(StringLike(b"test1")))),
-            (PactType::any_try_into(&s2), Ok(PactType::StringLike(StringLike(b"test2")))),
-            (PactType::any_try_into(&s3), Ok(PactType::StringLike(StringLike(b"test3")))),
+            (s1.into_pact(), PactType::StringLike(StringLike(b"test1"))),
+            (s2.into_pact(), PactType::StringLike(StringLike(b"test2"))),
+            (s3.into_pact(), PactType::StringLike(StringLike(b"test3"))),
         ];
         for (lhs, rhs) in tests {
             assert_eq!(lhs, rhs);
