@@ -19,13 +19,9 @@ pub trait IntoPact<'a, I> {
     fn into_pact(self) -> Result<PactType<'a>, ()>;
 }
 
-/// Dummy structs
-struct Numbers;
-struct Strings;
-
 /// Impl for all types that implement fallible conversion into u64
 // FIXME: impl Into<u128> after this is implemented https://github.com/cennznet/pact/issues/1
-impl<'a, T: TryInto<u64> + Copy> IntoPact<'a, &Numbers> for T {
+impl<'a, T: TryInto<u64> + Copy> IntoPact<'a, &T> for T {
     fn into_pact(self) -> Result<PactType<'a>, ()> {
         let result: u64 = self.try_into().map_err(|_| ())?;
         Ok(PactType::Numeric(Numeric(result)))
@@ -33,7 +29,7 @@ impl<'a, T: TryInto<u64> + Copy> IntoPact<'a, &Numbers> for T {
 }
 
 /// Impl for all types that can be converted to &[u8]
-impl<'a, T: AsRef<[u8]> + ?Sized> IntoPact<'a, &Strings> for &'a T {
+impl<'a, T: AsRef<[u8]> + ?Sized> IntoPact<'a, &T> for &'a T {
     fn into_pact(self) -> Result<PactType<'a>, ()> {
         Ok(PactType::StringLike(StringLike(self.as_ref())))
     }
