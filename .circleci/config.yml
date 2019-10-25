@@ -10,7 +10,8 @@ jobs:
           command: |
             rustup install nightly
             rustup default nightly
-            rustup component add rustfmt clippy
+            rustup component add rustfmt
+            rustup component add clippy || cargo install --git https://github.com/rust-lang/rust-clippy/ --force clippy
       - run:
           name: cargo check
           command: |
