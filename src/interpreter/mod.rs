@@ -32,15 +32,11 @@ pub fn interpret(
 ) -> Result<bool, InterpErr> {
     let mut interpreter = Interpreter::new(input_data, user_data);
     let mut scanner = source.iter();
-    loop {
-        if let Some(op) = OpCode::parse(&mut scanner)? {
-            match interpreter.interpret(op) {
-                Err(InterpErr::Refused) => break,
-                Err(err) => return Err(err),
-                Ok(_) => {}
-            }
-        } else {
-            break;
+    while let Some(op) = OpCode::parse(&mut scanner)? {
+        match interpreter.interpret(op) {
+            Err(InterpErr::Refused) => break,
+            Err(err) => return Err(err),
+            Ok(_) => {}
         }
     }
 
@@ -109,21 +105,21 @@ pub enum OpCode {
 
 impl OpCode {
     /// Return whether this OpCode is a load or not
-    pub fn is_load(&self) -> bool {
+    pub fn is_load(self) -> bool {
         match self {
             OpCode::LD_INPUT(_) | OpCode::LD_USER(_) => true,
             _ => false,
         }
     }
     /// Return whether this OpCode is a comparator or not
-    pub fn is_comparator(&self) -> bool {
+    pub fn is_comparator(self) -> bool {
         match self {
             OpCode::EQ | OpCode::GT | OpCode::GTE | OpCode::IN | OpCode::LT | OpCode::LTE => true,
             _ => false,
         }
     }
     /// Return whether this OpCode is a conjunction or not
-    pub fn is_conjunction(&self) -> bool {
+    pub fn is_conjunction(self) -> bool {
         match self {
             OpCode::AND | OpCode::OR | OpCode::XOR => true,
             _ => false,
@@ -188,7 +184,7 @@ impl Into<u8> for OpCode {
 }
 
 /// Evaluate a comparator OpCode returning its result
-fn eval_comparator(op: &OpCode, lhs: &PactType, rhs: &PactType) -> Result<bool, InterpErr> {
+fn eval_comparator(op: OpCode, lhs: &PactType, rhs: &PactType) -> Result<bool, InterpErr> {
     if !op.is_comparator() {
         return Err(InterpErr::UnexpectedOpCode(0));
     }
@@ -256,7 +252,7 @@ impl<'a> Interpreter<'a> {
                     comparator: op,
                     last_assertion_and_conjunction: None,
                 };
-                return Ok(());
+                Ok(())
             }
             State::ComparatorQueued {
                 comparator,
@@ -284,7 +280,7 @@ impl<'a> Interpreter<'a> {
                     lhs: lhs.clone(),
                     last_assertion_and_conjunction: *last_assertion_and_conjunction,
                 };
-                return Ok(());
+                Ok(())
             }
             State::ComparatorLHSLoaded {
                 comparator,
@@ -306,7 +302,7 @@ impl<'a> Interpreter<'a> {
                         .ok_or(InterpErr::MissingIndex(index)),
                     _ => panic!("unreachable"),
                 }?;
-                let mut result = eval_comparator(comparator, &lhs, rhs)?;
+                let mut result = eval_comparator(*comparator, &lhs, rhs)?;
 
                 // A conjunction is also pending, apply it, merging the last and current result.
                 if let Some((last_assertion, conjunction)) = last_assertion_and_conjunction {
@@ -320,7 +316,7 @@ impl<'a> Interpreter<'a> {
                 } else {
                     self.state = State::AssertionFalse;
                 };
-                return Ok(());
+                Ok(())
             }
             State::AssertionTrue => {
                 if op.is_load() {
@@ -337,7 +333,7 @@ impl<'a> Interpreter<'a> {
                         last_assertion_and_conjunction: None,
                     };
                 };
-                return Ok(());
+                Ok(())
             }
             State::AssertionFalse => {
                 // There is no continuation of the last assertion.
@@ -354,7 +350,7 @@ impl<'a> Interpreter<'a> {
                     last_assertion: false,
                     conjunction: op,
                 };
-                return Ok(());
+                Ok(())
             }
             State::Conjunctive {
                 conjunction,
@@ -369,9 +365,9 @@ impl<'a> Interpreter<'a> {
                     comparator: op,
                     last_assertion_and_conjunction: Some((*last_assertion, *conjunction)),
                 };
-                return Ok(());
+                Ok(())
             }
-            State::Failed => return Err(InterpErr::Refused),
+            State::Failed => Err(InterpErr::Refused),
         }
     }
 }

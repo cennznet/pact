@@ -89,7 +89,7 @@ pub fn compile<'a>(ir: &'a [ast::Node]) -> Result<Contract<'a>, CompileErr> {
     for node in ir.iter() {
         match node {
             ast::Node::InputDeclaration(idents) => {
-                for (index, ident) in idents.into_iter().enumerate() {
+                for (index, ident) in idents.iter().enumerate() {
                     compiler
                         .input_var_index
                         .insert(ident.to_string(), index as u8);
@@ -214,8 +214,7 @@ fn compile_conjunctive(conjunctive: &ast::Conjunctive) -> Result<OpCode, Compile
     Ok(match conjunctive {
         ast::Conjunctive::And => OpCode::AND,
         ast::Conjunctive::Or => OpCode::OR,
-    }
-    .into())
+    })
 }
 
 /// Compile a comparator AST node
@@ -226,8 +225,7 @@ fn compile_comparator(comparator: &ast::Comparator) -> Result<OpCode, CompileErr
         ast::Comparator::GreaterThanOrEqual => OpCode::GTE,
         ast::Comparator::LessThan => OpCode::LT,
         ast::Comparator::LessThanOrEqual => OpCode::LTE,
-    }
-    .into())
+    })
 }
 
 #[cfg(test)]

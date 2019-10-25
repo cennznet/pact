@@ -49,7 +49,7 @@ impl<'a> PactType<'a> {
                 buf.push(1.swap_bits());
                 // only supporting 64-bit numeric here.
                 buf.push(8.swap_bits());
-                for b in n.0.to_le_bytes().into_iter() {
+                for b in n.0.to_le_bytes().iter() {
                     buf.push(b.swap_bits())
                 }
             }
@@ -85,7 +85,7 @@ impl<'a> PactType<'a> {
                 ])));
                 Ok((n, 10usize))
             }
-            _ => return Err("unsupported type ID"),
+            _ => Err("unsupported type ID"),
         }
     }
 }
