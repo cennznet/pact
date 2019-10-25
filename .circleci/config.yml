@@ -9,9 +9,8 @@ jobs:
           name: setup
           command: |
             rustup install nightly
-            rustup default nightly
             rustup component add rustfmt
-            rustup component add clippy || cargo install --git https://github.com/rust-lang/rust-clippy/ --force clippy
+            rustup component add clippy
       - run:
           name: cargo check
           command: |
@@ -34,8 +33,8 @@ jobs:
       - run:
           name: "Check 'no std' build"
           command: |
-            cargo --version --verbose
-            cargo check --no-default-features
+            cargo +nightly --version --verbose
+            cargo +nightly check --no-default-features
 workflows:
   version: 2
   run-build:
