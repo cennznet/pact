@@ -9,13 +9,17 @@ jobs:
           name: setup
           command: |
             rustup install nightly
-            rustup default nightly
-            rustup component add rustfmt
+            rustup component add rustfmt clippy
       - run:
           name: cargo check
           command: |
             cargo --version --verbose
             cargo check
+      - run:
+          name: cargo clippy
+          # FIXME remove "allow" after this issue is fixed: https://git.io/Je07b
+          command: |
+            cargo clippy -- --allow clippy::needless_lifetimes
       - run:
           name: cargo fmt
           command: |
@@ -28,8 +32,8 @@ jobs:
       - run:
           name: "Check 'no std' build"
           command: |
-            cargo --version --verbose
-            cargo check --no-default-features
+            cargo +nightly --version --verbose
+            cargo +nightly check --no-default-features
 workflows:
   version: 2
   run-build:

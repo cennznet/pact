@@ -34,8 +34,8 @@ impl<'a> DataTable<'a> {
             t.encode(buf);
         }
     }
-    /// Decode a DataTable from `buf`.  
-    /// Return the DataTable and # of bytes read or error on failure.  
+    /// Decode a DataTable from `buf`.
+    /// Return the DataTable and # of bytes read or error on failure.
     pub fn decode(buf: &'a [u8]) -> Result<(Self, usize), &'static str> {
         let mut table = DataTable(Default::default());
         let mut offset: usize = 1;
@@ -45,7 +45,7 @@ impl<'a> DataTable<'a> {
             table.push(pact_type);
             offset += read;
         }
-        return Ok((table, offset));
+        Ok((table, offset))
     }
 }
 
