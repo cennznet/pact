@@ -15,8 +15,8 @@
 //! Primitive types in the pact interpreter.
 //!
 pub use crate::interpreter::type_cast::IntoPact;
+use alloc::vec::Vec;
 use bit_reverse::ParallelReverse;
-use std::vec::Vec;
 
 /// A string-like type
 #[cfg_attr(feature = "std", derive(Debug))]

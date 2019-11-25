@@ -16,7 +16,10 @@
 // 'std' is required for parser and compilation
 // interpreter can execute in `no_std` environment
 #[cfg(not(feature = "std"))]
-extern crate alloc as std;
+extern crate alloc;
+
+#[cfg(feature = "std")]
+extern crate std as alloc;
 
 #[cfg(feature = "std")]
 extern crate pest;
@@ -27,6 +30,8 @@ extern crate pest_derive;
 
 pub mod interpreter;
 pub use interpreter::types;
+
+pub mod contract;
 
 #[cfg(feature = "std")]
 pub mod compiler;
