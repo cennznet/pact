@@ -12,9 +12,8 @@
 // limitations under the License.
 
 use crate::interpreter::types::PactType;
-use bit_reverse::ParallelReverse;
-
 use alloc::vec::Vec;
+use bit_reverse::ParallelReverse;
 
 /// A pact contract's static data table
 #[cfg_attr(feature = "std", derive(PartialEq, Debug))]

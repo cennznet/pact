@@ -11,8 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::contract::data_table::DataTable;
-use crate::contract::Contract;
+use crate::contract::{Contract, DataTable};
 use crate::interpreter::types::{Numeric, PactType, StringLike};
 use crate::interpreter::OpCode;
 use crate::parser::ast;

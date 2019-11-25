@@ -11,11 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod data_table;
-use bit_reverse::ParallelReverse;
-pub use data_table::DataTable;
+mod data_table;
 
 use alloc::vec::Vec;
+use bit_reverse::ParallelReverse;
+pub use data_table::DataTable;
 
 #[cfg_attr(feature = "std", derive(Debug, PartialEq))]
 /// A binary format error

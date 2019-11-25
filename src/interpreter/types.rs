@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//!s
+//!
 //! Primitive types in the pact interpreter.
 //!
 pub use crate::interpreter::type_cast::AnyTryInto;
