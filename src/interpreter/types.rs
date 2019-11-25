@@ -58,21 +58,37 @@ impl<'a> PactType<'a> {
     /// Decode a pact type from the given buffer
     /// Returns (decoded type, bytes read) or error on failure
     pub fn decode(buf: &'a [u8]) -> Result<(Self, usize), &'static str> {
-        // Empty or too short (needs at least one header byte)
-        if buf.len() <= 1 {
-            return Err("too short");
-        }
+        // Check type header bytes
+        match buf.len() {
+            0 => return Err("missing type ID byte"),
+            1 => return Err("missing type length byte"),
+            _ => (),
+        };
+
+        // 1 byte type ID + 1 byte length gives 2 offset
+        let read_offset = 2_usize;
+
+        // Read type ID byte
         match buf[0].swap_bits() {
             0 => {
-                let read_len = 2usize + buf[1].swap_bits() as usize;
-                let s = PactType::StringLike(StringLike(&buf[2..read_len]));
-                Ok((s, read_len))
+                // Read length byte
+                let data_length = buf[1].swap_bits() as usize;
+                if data_length > buf[read_offset..].len() {
+                    return Err("type length > buffer length");
+                }
+                let read_length = read_offset + data_length;
+                let s = PactType::StringLike(StringLike(&buf[read_offset..read_length]));
+                Ok((s, read_length))
             }
             1 => {
-                // only supporting 64-bit numeric here
-                if (buf[2..].len() as u8) < 8 {
-                    return Err("implmentation only supports 64-bit numerics");
+                let data_length = buf[1].swap_bits() as usize;
+                if data_length > 8 {
+                    return Err("implementation only supports 64-bit numerics");
                 }
+                if buf[read_offset..].len() < 8 {
+                    return Err("type length > buffer length");
+                }
+
                 let n = PactType::Numeric(Numeric(u64::from_le_bytes([
                     buf[2].swap_bits(),
                     buf[3].swap_bits(),
@@ -138,5 +154,27 @@ mod tests {
 
         assert_eq!(numeric_type, PactType::Numeric(Numeric(123)));
         assert_eq!(10usize, bytes_read,);
+    }
+
+    #[test]
+    fn it_fails_with_missing_type_id() {
+        assert_eq!(PactType::decode(&[]), Err("missing type ID byte"));
+    }
+
+    #[test]
+    fn it_fails_with_missing_type_length() {
+        assert_eq!(PactType::decode(&[0]), Err("missing type length byte"));
+    }
+
+    #[test]
+    #[should_panic(expected = "type length > buffer length")]
+    fn it_fails_with_short_string_like() {
+        PactType::decode(&[0, 11]).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "implementation only supports 64-bit numerics")]
+    fn it_fails_with_u128_numeric() {
+        PactType::decode(&[1.swap_bits(), 16.swap_bits()]).unwrap();
     }
 }
