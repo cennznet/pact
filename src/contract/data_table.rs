@@ -12,6 +12,7 @@
 // limitations under the License.
 
 use crate::interpreter::types::PactType;
+use alloc::vec::Vec;
 use bit_reverse::ParallelReverse;
 
 /// A pact contract's static data table

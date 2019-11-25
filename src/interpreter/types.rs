@@ -15,8 +15,8 @@
 //! Primitive types in the pact interpreter.
 //!
 pub use crate::interpreter::type_cast::AnyTryInto;
+use alloc::vec::Vec;
 use bit_reverse::ParallelReverse;
-use std::vec::Vec;
 
 /// A string-like type
 #[cfg_attr(feature = "std", derive(Debug))]
@@ -49,7 +49,7 @@ impl<'a> PactType<'a> {
                 buf.push(1.swap_bits());
                 // only supporting 64-bit numeric here.
                 buf.push(8.swap_bits());
-                for b in n.0.to_le_bytes().into_iter() {
+                for b in n.0.to_le_bytes().iter() {
                     buf.push(b.swap_bits())
                 }
             }

@@ -12,7 +12,7 @@
 // limitations under the License.
 
 #![cfg(test)]
-use pact::compiler::{BinaryFormatErr, Contract, DataTable};
+use pact::contract::{BinaryFormatErr, Contract, DataTable};
 use pact::interpreter::OpCode;
 use pact::types::{Numeric, PactType, StringLike};
 
