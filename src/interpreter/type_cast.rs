@@ -12,10 +12,10 @@
 // limitations under the License.
 
 use crate::interpreter::types::{Numeric, PactType, StringLike};
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::any::Any;
 use core::convert::TryFrom;
-use std::string::String;
-use std::vec::Vec;
 
 #[derive(Debug, PartialEq)]
 pub enum PactConversionErr {

@@ -15,7 +15,9 @@ pub mod data_table;
 use bit_reverse::ParallelReverse;
 pub use data_table::DataTable;
 
-#[derive(Debug, PartialEq)]
+use alloc::vec::Vec;
+
+#[cfg_attr(feature = "std", derive(Debug, PartialEq))]
 /// A binary format error
 pub enum BinaryFormatErr {
     /// Version mismatch
@@ -28,7 +30,7 @@ pub enum BinaryFormatErr {
 
 /// A pact contract
 /// It has byte code and an accompanying data section
-#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "std", derive(Debug, PartialEq))]
 pub struct Contract<'a> {
     pub data_table: DataTable<'a>,
     pub bytecode: Vec<u8>,
@@ -44,7 +46,6 @@ impl<'a> Contract<'a> {
     /// Decode a pact contract from v0 binary format
     pub fn decode(buf: &'a [u8]) -> Result<Self, BinaryFormatErr> {
         if buf.len() < 2 {
-            println!("len: {:?}", buf.len());
             return Err(BinaryFormatErr::TooShort);
         }
         if buf[0].swap_bits() != 0 {

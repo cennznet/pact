@@ -14,6 +14,8 @@
 use crate::interpreter::types::PactType;
 use bit_reverse::ParallelReverse;
 
+use alloc::vec::Vec;
+
 /// A pact contract's static data table
 #[cfg_attr(feature = "std", derive(PartialEq, Debug))]
 pub struct DataTable<'a>(Vec<PactType<'a>>);
