@@ -54,7 +54,7 @@ fn contract_binary_format_malformed_data_table() {
     let mut malformed_short: Vec<u8> = vec![0, 1];
     assert_eq!(
         Contract::decode(&mut malformed_short),
-        Err(BinaryFormatErr::MalformedDataTable("too short"))
+        Err(BinaryFormatErr::MalformedDataTable("missing type ID byte"))
     );
 
     let mut bad_type_id = vec![0, 0b1000_0000, 0b0000_0001, 0b0000_0001];
@@ -67,7 +67,7 @@ fn contract_binary_format_malformed_data_table() {
     assert_eq!(
         Contract::decode(&mut numeric_too_large),
         Err(BinaryFormatErr::MalformedDataTable(
-            "implmentation only supports 64-bit numerics"
+            "implementation only supports 64-bit numerics"
         ))
     );
 }

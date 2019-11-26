@@ -28,7 +28,7 @@ pub enum CompileErr {
 }
 
 /// Compile a pact contract AST into bytecode
-pub fn compile<'a>(ir: &'a [ast::Node]) -> Result<Contract<'a>, CompileErr> {
+pub fn compile(ir: &[ast::Node]) -> Result<Contract, CompileErr> {
     // 1. Semantically verify the AST
     //     - Duplicate var definition
     //     - Missing var definition
