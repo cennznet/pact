@@ -11,11 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod data_table;
-
+//!
+//! Contract struct
+//!
+use crate::types::DataTable;
 use alloc::vec::Vec;
 use bit_reverse::ParallelReverse;
-pub use data_table::DataTable;
 
 #[cfg_attr(feature = "std", derive(Debug, PartialEq))]
 /// A binary format error
