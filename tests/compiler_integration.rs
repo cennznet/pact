@@ -21,8 +21,10 @@ use pact::types::{Numeric, PactType, StringLike};
 fn it_compiles() {
     let ast = parser::parse(
         "
-          given parameters $a,$b
+          given parameters $a,$b,$user
+          define $trusted as [\"alice\", \"bob\"]
           $a must be less than or equal to 123 and $b must be equal to \"hello world\"
+          $user must be one of $trusted
         ",
     )
     .unwrap();
@@ -31,10 +33,12 @@ fn it_compiles() {
     println!("Data Table: {:?}", contract.data_table);
     println!("Bytecode: {:?}", contract.bytecode);
 
-    // The manually crafted input table
+    // The manually crafted input table.
+    // This would be populated with transaction parameters in real execution
     let input_table = &[
         PactType::Numeric(Numeric(5)),
         PactType::StringLike(StringLike("hello world".as_bytes())),
+        PactType::StringLike(StringLike("alice".as_bytes())),
     ];
     println!("Input Table: {:?}", input_table);
 

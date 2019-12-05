@@ -102,7 +102,7 @@ fn it_fails_with_bad_type_operation_on_stringlike() {
         OpCode::LT.into(),
         OpCode::LTE.into(),
     ];
-    for op in bad_op_codes.into_iter() {
+    for op in bad_op_codes {
         let result = interpreter::interpret(
             &[PactType::StringLike(StringLike(b"test"))],
             &[PactType::StringLike(StringLike(b"test"))],
@@ -441,4 +441,85 @@ fn it_does_a_gte_comparison_evaluates_false() {
     );
 
     assert_eq!(result, Ok(false));
+}
+
+#[test]
+fn it_does_a_membership_check_ok() {
+    let result = interpreter::interpret(
+        &[
+            PactType::Numeric(Numeric(123)),
+            PactType::StringLike(StringLike(b"hello world")),
+        ],
+        &[
+            PactType::List(vec![
+                PactType::Numeric(Numeric(123)),
+                PactType::Numeric(Numeric(456)),
+            ]),
+            PactType::List(vec![
+                PactType::StringLike(StringLike(b"hello world")),
+                PactType::StringLike(StringLike(b"foo bar")),
+            ]),
+        ],
+        &[
+            // IN LD_INPUT(0) LD_USER(0)
+            OpCode::IN.into(),
+            0,
+            0,
+            1,
+            0,
+            // IN LD_INPUT(1) LD_USER(1)
+            OpCode::IN.into(),
+            0,
+            1,
+            1,
+            1,
+        ],
+    );
+
+    assert_eq!(result, Ok(true));
+}
+
+#[test]
+fn it_does_a_membership_check_evaluates_false() {
+    let result = interpreter::interpret(
+        &[PactType::StringLike(StringLike(b"baz"))],
+        &[PactType::List(vec![
+            PactType::StringLike(StringLike(b"hello world")),
+            PactType::StringLike(StringLike(b"foo bar")),
+        ])],
+        &[
+            // IN LD_INPUT(0) LD_USER(0)
+            OpCode::IN.into(),
+            0,
+            0,
+            1,
+            0,
+        ],
+    );
+
+    assert_eq!(result, Ok(false));
+}
+
+#[test]
+fn list_is_invalid_on_lhs_of_comparison() {
+    let result = interpreter::interpret(
+        &[PactType::List(vec![])],
+        &[PactType::List(vec![])],
+        &[OpCode::IN.into(), 0, 0, 1, 0],
+    );
+    assert_eq!(result, Err(InterpErr::BadTypeOperation));
+}
+
+#[test]
+fn non_membership_operations_fail_for_lists() {
+    for op in vec![OpCode::EQ, OpCode::LT, OpCode::LTE, OpCode::GT, OpCode::GTE] {
+        assert_eq!(
+            interpreter::interpret(
+                &[PactType::StringLike(StringLike(b"hello world"))],
+                &[PactType::List(vec![])],
+                &[op.into(), 0, 0, 1, 0,]
+            ),
+            Err(InterpErr::BadTypeOperation)
+        );
+    }
 }

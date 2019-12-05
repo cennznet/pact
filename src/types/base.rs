@@ -31,8 +31,9 @@ pub struct Numeric(pub u64);
 #[cfg_attr(feature = "std", derive(Debug, PartialEq))]
 #[derive(Clone)]
 pub enum PactType<'a> {
-    StringLike(StringLike<'a>),
     Numeric(Numeric),
+    List(Vec<PactType<'a>>),
+    StringLike(StringLike<'a>),
 }
 
 impl<'a> PactType<'a> {
@@ -52,6 +53,7 @@ impl<'a> PactType<'a> {
                     buf.push(b.swap_bits())
                 }
             }
+            PactType::List(_) => panic!("unimplemented"),
         };
     }
     /// Decode a pact type from the given buffer

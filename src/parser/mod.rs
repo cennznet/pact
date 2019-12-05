@@ -35,7 +35,7 @@ pub fn parse(source: &str) -> Result<Vec<ast::Node>, Error<Rule>> {
             }
             Rule::assertion | Rule::definition => {
                 let node = build_ast_from_statement(pair);
-                println!("{:?}", node);
+                println!("Node: {:?}", node);
                 ast.push(node);
             }
             Rule::EOI => {}
@@ -54,6 +54,7 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> ast::Node {
         Rule::definition => {
             let mut definition = pair.into_inner();
             let identifier = definition.next().unwrap().as_str().into();
+            println!("Id: {}", identifier);
             let value = build_value(definition.next().unwrap());
 
             ast::Node::Definition(identifier, value)
@@ -89,6 +90,7 @@ fn build_assertion(pair: pest::iterators::Pair<Rule>) -> ast::Assertion {
         Rule::gte => ast::Comparator::GreaterThanOrEqual,
         Rule::lt => ast::Comparator::LessThan,
         Rule::lte => ast::Comparator::LessThanOrEqual,
+        Rule::element_of => ast::Comparator::ElementOf,
         _ => panic!("unreachable"),
     };
     println!("comparator: {:?}", comparator);
@@ -119,13 +121,24 @@ fn build_assertion(pair: pest::iterators::Pair<Rule>) -> ast::Assertion {
 
 /// Build a `value` node from a pest input pair
 fn build_value(pair: pest::iterators::Pair<Rule>) -> ast::Value {
+    println!("{:?}", pair.as_rule());
+    println!("{:?}", pair.as_span());
     let value = pair.into_inner().next().unwrap();
     match value.as_rule() {
-        Rule::string => {
-            // TODO: The generated parser + grammar should ignore '"' but it's not
-            ast::Value::StringLike(value.as_str().trim_matches('"').into())
-        }
+        Rule::string => ast::Value::StringLike(value.as_str().trim_matches('"').into()),
+        Rule::strings => ast::Value::List(
+            value
+                .into_inner()
+                .map(|s| ast::Value::StringLike(s.as_str().trim_matches('"').into()))
+                .collect(),
+        ),
         Rule::integer => ast::Value::Numeric(value.as_str().parse().unwrap()),
+        Rule::integers => ast::Value::List(
+            value
+                .into_inner()
+                .map(|n| ast::Value::Numeric(n.as_str().parse().unwrap()))
+                .collect(),
+        ),
         _ => panic!("unreachable"),
     }
 }

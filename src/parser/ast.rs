@@ -63,6 +63,8 @@ pub enum Comparator {
     GreaterThanOrEqual,
     LessThan,
     LessThanOrEqual,
+    // i.e set membership check: _a_ 'in' {1,2,3}
+    ElementOf,
 }
 
 /// A subject of a comparator (LHS / RHS).
@@ -76,8 +78,11 @@ pub enum Subject {
 /// A literal value, used in place for a comparator or on the RHS of a definition
 #[derive(Clone, Debug)]
 pub enum Value {
-    StringLike(String),
     Numeric(u64),
+    StringLike(String),
+    /// A homogenous list of `Value` nodes
+    /// While it is possible to nest lists with this definition, it is not supported semantically.
+    List(Vec<Value>),
 }
 
 pub type Identifier = String;

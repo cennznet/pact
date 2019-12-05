@@ -197,7 +197,12 @@ fn eval_comparator(op: OpCode, lhs: &PactType, rhs: &PactType) -> Result<bool, I
         },
         (PactType::StringLike(l), PactType::StringLike(r)) => match op {
             OpCode::EQ => Ok(l == r),
-            OpCode::IN => Err(InterpErr::UnsupportedOpCode("IN is not supported yet")),
+            _ => Err(InterpErr::BadTypeOperation),
+        },
+        // List types are unsupported on LHS
+        (PactType::List(_), _) => Err(InterpErr::BadTypeOperation),
+        (l, PactType::List(r)) => match op {
+            OpCode::IN => Ok(r.contains(l)),
             _ => Err(InterpErr::BadTypeOperation),
         },
         _ => Err(InterpErr::TypeMismatch),

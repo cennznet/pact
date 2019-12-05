@@ -45,3 +45,29 @@ fn it_parses() {
     .unwrap();
     println!("{:?}", ast);
 }
+
+#[test]
+fn it_parses_an_integer_list() {
+    let ast = parser::parse(
+        "
+      given parameters $charlie, $tango, $delta
+      define $test as 12345
+      5 must be one of [123, 5, 12, 100, 55]
+      \"hello world\" must be equal to \"dorem ipsum\"",
+    )
+    .unwrap();
+    println!("{:?}", ast);
+}
+
+#[test]
+fn it_parses_a_string_list() {
+    let ast = parser::parse(
+        "
+      given parameters $payee
+      define $trusted as [\"a\", \"b\", \"c\"]
+      $payee must be one of $trusted
+        ",
+    )
+    .unwrap();
+    println!("{:?}", ast);
+}

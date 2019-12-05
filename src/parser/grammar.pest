@@ -29,23 +29,30 @@ must_not_be = { "must not be" }
 imperative = _{ must_be | must_not_be }
 
 // Comparators
+element_of = { "one of" }
 eq = { "equal to" }
 lt = { "less than" }
 lte = { "less than or equal to" }
 gt = { "greater than" }
 gte = { "greater than or equal to" }
-comparator = _{ eq | gte | gt | lte | lt }
+comparator = _{ eq | gte | gt | lte | lt | element_of }
 
 assertion = { subject ~ imperative ~ comparator ~ subject ~ (conjunction ~ assertion)? }
 definition = { "define" ~ identifier ~ "as" ~ value }
 
 // Variables
 subject = _{ value | identifier }
-value = { string | integer }
+value = { string | strings | integer | integers }
+ // one or more "," delimited `integer`
+integers = { list_open ~ integer ~ ("," ~ integer)* ~ list_close }
+// one or more ',' delimited `string`
+strings = { list_open ~ string ~ ("," ~ string)* ~ list_close }
 integer = @{ ASCII_DIGIT+ }
 string = { quote ~ ASCII_ALPHANUMERIC+ ~ quote }
 identifier = @{ dollar ~ ASCII_ALPHA+ ~ (ASCII_ALPHANUMERIC)* }
 dollar = _{ "$" }
 quote = _{ "\"" }
+list_open = _{ "[" }
+list_close = _{ "]" }
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }
