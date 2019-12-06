@@ -28,8 +28,8 @@ pub struct StringLike<'a>(pub &'a [u8]);
 pub struct Numeric(pub u64);
 
 /// Over-arching pact type system
-#[cfg_attr(feature = "std", derive(Debug, PartialEq))]
-#[derive(Clone)]
+#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Clone, PartialEq)]
 pub enum PactType<'a> {
     Numeric(Numeric),
     List(Vec<PactType<'a>>),
