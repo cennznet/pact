@@ -12,9 +12,8 @@
 // limitations under the License.
 
 #![cfg(test)]
-use pact::contract::{BinaryFormatErr, Contract, DataTable};
 use pact::interpreter::OpCode;
-use pact::types::{Numeric, PactType, StringLike};
+use pact::types::{BinaryFormatErr, Contract, DataTable, Numeric, PactType, StringLike};
 
 #[test]
 fn contract_binary_format_codec() {

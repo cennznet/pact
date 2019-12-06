@@ -14,9 +14,7 @@
 //!
 //! The pact bytecode interpreter
 //!
-pub mod type_cast;
-pub mod types;
-use types::PactType;
+use crate::types::PactType;
 
 // OpCode masks
 const OP_MASK: u8 = 0b0011_1111;
@@ -24,7 +22,7 @@ const OP_MASK: u8 = 0b0011_1111;
 /// Interpret some pact byte code (`source`) with input data registers (`input_data`) and
 /// user data registers (`user_data`).
 /// Returns a boolean indicating whether the pact contract was validated or not,
-/// An InterpErr is returned on a runtime error e.g. malformed byte code, missing data, invalid OpCode etc.
+/// An `InterpErr` is returned on a runtime error e.g. malformed byte code, missing data, invalid OpCode etc.
 pub fn interpret(
     input_data: &[PactType],
     user_data: &[PactType],
@@ -65,7 +63,7 @@ pub enum InterpErr {
     InvalidOpCode(u8),
     /// A referenced index in the data table does not exist
     MissingIndex(u8),
-    /// Raised when trying to execute an OpCode from an intpreter which is in a failed state
+    /// Raised when trying to execute an OpCode from an interpreter which is in a failed state
     Refused,
 }
 
@@ -73,8 +71,7 @@ pub enum InterpErr {
 ///
 /// Big Endian OpCodes
 /// - 6 bit OpCode index
-/// - 1 bit reserved
-/// - 1 bit reserved
+/// - 2 bit reserved
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Clone, Copy)]

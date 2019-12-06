@@ -12,9 +12,8 @@
 // limitations under the License.
 
 //!
-//! Primitive types in the pact interpreter.
+//! Types in the pact interpreter aka "PactType"s
 //!
-pub use crate::interpreter::type_cast::IntoPact;
 use alloc::vec::Vec;
 use bit_reverse::ParallelReverse;
 

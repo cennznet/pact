@@ -11,7 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::interpreter::types::{Numeric, PactType, StringLike};
+//!
+//! Type conversion traits and impls for `PactType`s
+//!
+use crate::types::{Numeric, PactType, StringLike};
 use core::convert::TryInto;
 
 /// A blanket trait for conversion into PactType

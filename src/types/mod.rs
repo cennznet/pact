@@ -11,25 +11,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![cfg_attr(not(feature = "std"), no_std)]
+//!
+//! Type definitions for the Pact interpreter and compiler
+//!
+mod base;
+mod contract;
+mod data_table;
+mod type_cast;
 
-// 'std' is required for parser and compilation
-// interpreter can execute in `no_std` environment
-#[cfg(not(feature = "std"))]
-extern crate alloc;
-#[cfg(feature = "std")]
-extern crate std as alloc;
-
-#[cfg(feature = "compiler")]
-extern crate pest;
-#[cfg(feature = "compiler")]
-#[macro_use]
-extern crate pest_derive;
-
-#[cfg(feature = "compiler")]
-pub mod compiler;
-#[cfg(feature = "compiler")]
-pub mod parser;
-
-pub mod interpreter;
-pub mod types;
+// Create nice top level exports
+pub use base::{Numeric, PactType, StringLike};
+pub use contract::{BinaryFormatErr, Contract};
+pub use data_table::DataTable;
+pub mod traits {
+    pub use super::type_cast::IntoPact;
+}

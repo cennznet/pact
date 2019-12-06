@@ -11,10 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::contract::{Contract, DataTable};
-use crate::interpreter::types::{Numeric, PactType, StringLike};
 use crate::interpreter::OpCode;
 use crate::parser::ast;
+use crate::types::{Contract, DataTable, Numeric, PactType, StringLike};
 
 use hashbrown::HashMap;
 
@@ -134,7 +133,7 @@ impl<'a> Compiler<'a> {
 
     /// Compile a subject AST node
     fn compile_subject(&mut self, subject: &'a ast::Subject) -> Result<OpCode, CompileErr> {
-        // `subject` could be a literal value or an indentifier
+        // `subject` could be a literal value or an identifier
         // A literal value should be stored in the user data table
         // An identifier should have been declared or it is an error
         match subject {

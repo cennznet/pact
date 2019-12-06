@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::interpreter::types::PactType;
+use crate::types::PactType;
 use alloc::vec::Vec;
 use bit_reverse::ParallelReverse;
 
@@ -59,7 +59,7 @@ impl<'a> AsRef<[PactType<'a>]> for DataTable<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::interpreter::types::{Numeric, StringLike};
+    use crate::types::{Numeric, StringLike};
 
     #[test]
     fn it_encodes() {
