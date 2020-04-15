@@ -446,16 +446,83 @@ fn it_does_a_gte_comparison_evaluates_false() {
 }
 
 #[test]
-fn it_does_an_in_comparison() {
-    let result = interpreter::interpret(
-        &[
-            PactType::Numeric(Numeric(2)), PactType::Numeric(Numeric(5))
-        ],
-        &[
-            PactType::List([PactType::Numeric(Numeric(1)), PactType::Numeric(Numeric(2))].to_vec())
-        ],
-        &[OpCode::IN.into(), 0, 0, 1, 0],
-    );
+fn it_does_a_numeric_in_comparison() {
+    let input_data = [PactType::Numeric(Numeric(2)), PactType::Numeric(Numeric(5))];
+    let user_data = [PactType::List(vec![
+        PactType::Numeric(Numeric(1)),
+        PactType::Numeric(Numeric(2)),
+    ])];
 
+    let result = interpreter::interpret(&input_data, &user_data, &[OpCode::IN.into(), 0, 0, 1, 0]);
     assert_eq!(result, Ok(true));
+
+    let result = interpreter::interpret(&input_data, &user_data, &[OpCode::IN.into(), 0, 1, 1, 0]);
+    assert_eq!(result, Ok(false));
+}
+
+#[test]
+fn it_does_a_string_in_comparison() {
+    let input_data = [
+        PactType::StringLike(StringLike(b"Never gonna")),
+        PactType::StringLike(StringLike(b"give you up")),
+    ];
+    let user_data = [PactType::List(vec![
+        PactType::StringLike(StringLike(b"Never gonna")),
+        PactType::StringLike(StringLike(b"let you down")),
+    ])];
+
+    let result = interpreter::interpret(&input_data, &user_data, &[OpCode::IN.into(), 0, 0, 1, 0]);
+    assert_eq!(result, Ok(true));
+
+    let result = interpreter::interpret(&input_data, &user_data, &[OpCode::IN.into(), 0, 1, 1, 0]);
+    assert_eq!(result, Ok(false));
+}
+
+#[test]
+fn it_fails_with_lhs_list_for_in_comparison() {
+    let input_data = [PactType::List(vec![
+        PactType::Numeric(Numeric(1)),
+        PactType::Numeric(Numeric(2)),
+    ])];
+    let user_data = [PactType::Numeric(Numeric(2)), PactType::Numeric(Numeric(5))];
+
+    // List in Numeric
+    let result = interpreter::interpret(&input_data, &user_data, &[OpCode::IN.into(), 0, 0, 1, 0]);
+    assert_eq!(result, Err(InterpErr::BadTypeOperation));
+
+    // List in List
+    let result = interpreter::interpret(&input_data, &input_data, &[OpCode::IN.into(), 0, 0, 1, 0]);
+    assert_eq!(result, Err(InterpErr::BadTypeOperation));
+}
+
+#[test]
+fn it_does_an_in_comparison_with_a_mixed_list() {
+    let input_data = [PactType::Numeric(Numeric(1931))];
+    let user_data = [PactType::List(vec![
+        PactType::StringLike(StringLike(b"It's alive! It's alive!")),
+        PactType::Numeric(Numeric(1931)),
+    ])];
+
+    let result = interpreter::interpret(&input_data, &user_data, &[OpCode::IN.into(), 0, 0, 1, 0]);
+    assert_eq!(result, Ok(true));
+}
+
+#[test]
+fn it_fails_for_invalid_list_operators() {
+    let input_data = [PactType::Numeric(Numeric(2))];
+    let user_data = [PactType::List(vec![
+        PactType::Numeric(Numeric(1)),
+        PactType::Numeric(Numeric(2)),
+    ])];
+
+    let invalid_code_set = [OpCode::EQ, OpCode::LT, OpCode::LTE, OpCode::GT, OpCode::GTE];
+
+    for invalid_code in &invalid_code_set {
+        let result = interpreter::interpret(
+            &input_data,
+            &user_data,
+            &[invalid_code.clone().into(), 0, 0, 1, 0],
+        );
+        assert_eq!(result, Err(InterpErr::BadTypeOperation));
+    }
 }

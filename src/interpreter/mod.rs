@@ -202,10 +202,13 @@ fn eval_comparator(op: OpCode, lhs: &PactType, rhs: &PactType) -> Result<bool, I
             OpCode::EQ => Ok(l == r),
             _ => Err(InterpErr::BadTypeOperation),
         },
+        (PactType::List(_), _) => match op {
+            _ => Err(InterpErr::BadTypeOperation),
+        },
         (l, PactType::List(r)) => match op {
             OpCode::IN => Ok(r.contains(l)),
             _ => Err(InterpErr::BadTypeOperation),
-        }
+        },
         _ => Err(InterpErr::TypeMismatch),
     }
 }
