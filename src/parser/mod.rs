@@ -23,7 +23,7 @@ use pest::Parser;
 #[grammar = "parser/grammar.pest"]
 pub struct PactParser;
 
-/// Attempt to parse the given `source` string as pact code.  
+/// Attempt to parse the given `source` string as pact code.
 /// Returns an AST on success, otherwise the relevant error
 pub fn parse(source: &str) -> Result<Vec<ast::Node>, Error<Rule>> {
     let mut ast: Vec<ast::Node> = Default::default();
@@ -92,6 +92,7 @@ fn build_assertion(pair: pest::iterators::Pair<Rule>) -> ast::Assertion {
         Rule::gte => ast::Comparator::GreaterThanOrEqual,
         Rule::lt => ast::Comparator::LessThan,
         Rule::lte => ast::Comparator::LessThanOrEqual,
+        Rule::one_of => ast::Comparator::OneOf,
         _ => panic!("unreachable"),
     };
     println!("comparator: {:?}", comparator);
@@ -129,6 +130,18 @@ fn build_value(pair: pest::iterators::Pair<Rule>) -> ast::Value {
             ast::Value::StringLike(value.as_str().trim_matches('"').into())
         }
         Rule::integer => ast::Value::Numeric(value.as_str().parse().unwrap()),
+        Rule::strings => ast::Value::List(
+            value
+                .into_inner()
+                .map(|s| ast::Value::StringLike(s.as_str().trim_matches('"').into()))
+                .collect(),
+        ),
+        Rule::integers => ast::Value::List(
+            value
+                .into_inner()
+                .map(|n| ast::Value::Numeric(n.as_str().parse().unwrap()))
+                .collect(),
+        ),
         _ => panic!("unreachable"),
     }
 }
