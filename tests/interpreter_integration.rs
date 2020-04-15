@@ -444,3 +444,18 @@ fn it_does_a_gte_comparison_evaluates_false() {
 
     assert_eq!(result, Ok(false));
 }
+
+#[test]
+fn it_does_an_in_comparison() {
+    let result = interpreter::interpret(
+        &[
+            PactType::Numeric(Numeric(2)), PactType::Numeric(Numeric(5))
+        ],
+        &[
+            PactType::List([PactType::Numeric(Numeric(1)), PactType::Numeric(Numeric(2))].to_vec())
+        ],
+        &[OpCode::IN.into(), 0, 0, 1, 0],
+    );
+
+    assert_eq!(result, Ok(true));
+}

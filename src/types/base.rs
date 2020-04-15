@@ -36,6 +36,7 @@ pub struct Numeric(pub u64);
 pub enum PactType<'a> {
     StringLike(StringLike<'a>),
     Numeric(Numeric),
+    List(Vec<PactType<'a>>),
 }
 
 impl<'a> PactType<'a> {
@@ -54,6 +55,9 @@ impl<'a> PactType<'a> {
                 for b in n.0.to_le_bytes().iter() {
                     buf.push(b.swap_bits())
                 }
+            }
+            PactType::List(_) => {
+                panic!("todo");
             }
         };
     }
