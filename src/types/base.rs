@@ -56,8 +56,21 @@ impl<'a> PactType<'a> {
                     buf.push(b.swap_bits())
                 }
             }
-            PactType::List(_) => {
-                panic!("todo");
+            PactType::List(l) => {
+                let mut buf_elements: Vec<u8> = vec![];
+                for element in l {
+                    match element {
+                        PactType::StringLike(_) => element.encode(&mut buf_elements),
+                        PactType::Numeric(_) => element.encode(&mut buf_elements),
+                        _ => {}, // element not supported
+                    }
+                }
+
+                buf.push(2.swap_bits());
+                buf.push((buf_elements.len() as u8).swap_bits());
+                buf.append(&mut buf_elements);
+
+                //panic!("todo");
             }
         };
     }
@@ -135,6 +148,29 @@ mod tests {
         let mut expected: Vec<u8> = vec![1, 8, 123, 0, 0, 0, 0, 0, 0, 0];
         expected = expected.into_iter().map(|b| b.swap_bits()).collect(); // convert to LE bit orders
         assert_eq!(buf, &expected);
+    }
+
+    #[test]
+    fn it_encodes_string_list() {
+        let l = PactType::List(vec![
+            PactType::StringLike(StringLike(b"we're no")),
+            PactType::StringLike(StringLike(b"strangers")),
+            PactType::StringLike(StringLike(b"to love")),
+        ]);
+        let buf: &mut Vec<u8> = &mut Vec::new();
+        l.encode(buf);
+
+        assert_eq!(buf[0].swap_bits(), 2);
+        assert_eq!(buf[1].swap_bits(), 30);
+        assert_eq!(buf[2].swap_bits(), 0);
+        assert_eq!(buf[3].swap_bits(), 8);
+        assert_eq!(&buf[4..12], b"we're no");
+        assert_eq!(buf[12].swap_bits(), 0);
+        assert_eq!(buf[13].swap_bits(), 9);
+        assert_eq!(&buf[14..23], b"strangers");
+        assert_eq!(buf[23].swap_bits(), 0);
+        assert_eq!(buf[24].swap_bits(), 7);
+        assert_eq!(&buf[25..32], b"to love");
     }
 
     #[test]
