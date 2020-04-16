@@ -264,6 +264,55 @@ mod tests {
     }
 
     #[test]
+    fn it_decodes_numeric_lists() {
+        let list_header: Vec<u8> = vec![2, 20];
+        let num_header: Vec<u8> = vec![1, 8];
+
+        let buf: Vec<u8> = [
+            list_header,
+            num_header.clone(),
+            vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef],
+            num_header,
+            vec![0xfe, 0xed, 0xfe, 0xed, 0xfe, 0xed, 0xfe, 0xed],
+        ].concat().into_iter().map(|b| b.swap_bits()).collect();
+
+        let (list_type, bytes_read) = PactType::decode(&buf).expect("it decodes");
+
+        let expected = PactType::List(vec![
+            PactType::Numeric(Numeric(0xefcd_ab89_6745_2301)),
+            PactType::Numeric(Numeric(0xedfe_edfe_edfe_edfe)),
+        ]);
+
+        assert_eq!(
+            list_type,
+            expected,
+        );
+
+        assert_eq!(bytes_read, 22usize);
+    }
+
+    #[test]
+    fn it_fails_decode_list_with_bad_length() {
+        let list_header: Vec<u8> = vec![2, 20];
+        let buf: Vec<u8> = [
+            list_header,
+            vec![1, 8],
+            vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef],
+        ].concat().into_iter().map(|b| b.swap_bits()).collect();
+
+        assert_eq!(PactType::decode(&buf), Err("type length > buffer length"));
+
+        let list_header: Vec<u8> = vec![2, 5];
+        let buf: Vec<u8> = [
+            list_header,
+            vec![1, 8],
+            vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef],
+        ].concat().into_iter().map(|b| b.swap_bits()).collect();
+
+        assert_eq!(PactType::decode(&buf), Err("list length overflow"));
+    }
+
+    #[test]
     fn it_fails_with_missing_type_id() {
         assert_eq!(PactType::decode(&[]), Err("missing type ID byte"));
     }
