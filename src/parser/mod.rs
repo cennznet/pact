@@ -92,7 +92,7 @@ fn build_assertion(pair: pest::iterators::Pair<Rule>) -> ast::Assertion {
         Rule::gte => ast::Comparator::GreaterThanOrEqual,
         Rule::lt => ast::Comparator::LessThan,
         Rule::lte => ast::Comparator::LessThanOrEqual,
-        Rule::element_of => ast::Comparator::OneOf,
+        Rule::one_of => ast::Comparator::OneOf,
         _ => panic!("unreachable"),
     };
     println!("comparator: {:?}", comparator);

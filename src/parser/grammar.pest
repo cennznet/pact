@@ -38,8 +38,8 @@ lt = { "less than" }
 lte = { "less than or equal to" }
 gt = { "greater than" }
 gte = { "greater than or equal to" }
-element_of = { "one of" }
-comparator = _{ eq | gte | gt | lte | lt | element_of }
+one_of = { "one of" }
+comparator = _{ eq | gte | gt | lte | lt | one_of }
 assertion = { subject ~ imperative ~ comparator ~ subject ~ (conjunction ~ assertion)? }
 definition = { "define" ~ identifier ~ "as" ~ value }
 
