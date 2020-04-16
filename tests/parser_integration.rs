@@ -82,3 +82,15 @@ fn it_parses_a_string_list() {
     )
     .unwrap();
 }
+
+#[test]
+#[should_panic]
+fn it_fails_when_parsing_a_mixed_list() {
+    let _ = parser::parse(
+        "
+      given parameters $rick, $astley
+      define $list as [\"Your hearts been aching but youre\", 2, \"shy to say it\"]
+      $rick must be one of $list",
+    )
+    .unwrap();
+}
