@@ -82,7 +82,7 @@ pub enum Subject {
 pub enum Value {
     StringLike(String),
     Numeric(u64),
-    List(Vec<Value>)
+    List(Vec<Value>),
 }
 
 pub type Identifier = String;

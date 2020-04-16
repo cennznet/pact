@@ -52,4 +52,3 @@ fn it_compiles() {
     println!("Result: {:?}", result);
     assert!(result.unwrap());
 }
-

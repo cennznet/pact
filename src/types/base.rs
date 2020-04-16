@@ -62,7 +62,7 @@ impl<'a> PactType<'a> {
                     match element {
                         PactType::StringLike(_) => element.encode(&mut buf_elements),
                         PactType::Numeric(_) => element.encode(&mut buf_elements),
-                        _ => {}, // element not supported
+                        _ => {} // element not supported
                     }
                 }
 
@@ -125,7 +125,8 @@ impl<'a> PactType<'a> {
                 while remaining_length > 0 {
                     let (new_value, offset) = Self::decode(&buf[read_offset..])?;
                     read_offset = read_offset + offset;
-                    remaining_length = remaining_length.checked_sub(offset)
+                    remaining_length = remaining_length
+                        .checked_sub(offset)
                         .ok_or("list length overflow")?;
                     values.push(new_value);
                 }
@@ -244,7 +245,8 @@ mod tests {
             b"and so".to_vec(),
             str3_header,
             b"do I".to_vec(),
-        ].concat();
+        ]
+        .concat();
 
         let (list_type, bytes_read) = PactType::decode(&buf).expect("it decodes");
 
@@ -255,10 +257,7 @@ mod tests {
             PactType::StringLike(StringLike(b"do I")),
         ]);
 
-        assert_eq!(
-            list_type,
-            expected,
-        );
+        assert_eq!(list_type, expected,);
 
         assert_eq!(bytes_read, 37usize);
     }
@@ -274,7 +273,11 @@ mod tests {
             vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef],
             num_header,
             vec![0xfe, 0xed, 0xfe, 0xed, 0xfe, 0xed, 0xfe, 0xed],
-        ].concat().into_iter().map(|b| b.swap_bits()).collect();
+        ]
+        .concat()
+        .into_iter()
+        .map(|b| b.swap_bits())
+        .collect();
 
         let (list_type, bytes_read) = PactType::decode(&buf).expect("it decodes");
 
@@ -283,10 +286,7 @@ mod tests {
             PactType::Numeric(Numeric(0xedfe_edfe_edfe_edfe)),
         ]);
 
-        assert_eq!(
-            list_type,
-            expected,
-        );
+        assert_eq!(list_type, expected,);
 
         assert_eq!(bytes_read, 22usize);
     }
@@ -298,7 +298,11 @@ mod tests {
             list_header,
             vec![1, 8],
             vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef],
-        ].concat().into_iter().map(|b| b.swap_bits()).collect();
+        ]
+        .concat()
+        .into_iter()
+        .map(|b| b.swap_bits())
+        .collect();
 
         assert_eq!(PactType::decode(&buf), Err("type length > buffer length"));
 
@@ -307,7 +311,11 @@ mod tests {
             list_header,
             vec![1, 8],
             vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef],
-        ].concat().into_iter().map(|b| b.swap_bits()).collect();
+        ]
+        .concat()
+        .into_iter()
+        .map(|b| b.swap_bits())
+        .collect();
 
         assert_eq!(PactType::decode(&buf), Err("list length overflow"));
     }
@@ -331,6 +339,26 @@ mod tests {
     #[test]
     #[should_panic(expected = "implementation only supports 64-bit numerics")]
     fn it_fails_with_u128_numeric() {
-        PactType::decode(&[1.swap_bits(), 16.swap_bits(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).unwrap();
+        PactType::decode(&[
+            1.swap_bits(),
+            16.swap_bits(),
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ])
+        .unwrap();
     }
 }

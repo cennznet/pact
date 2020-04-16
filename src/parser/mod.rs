@@ -130,22 +130,18 @@ fn build_value(pair: pest::iterators::Pair<Rule>) -> ast::Value {
             ast::Value::StringLike(value.as_str().trim_matches('"').into())
         }
         Rule::integer => ast::Value::Numeric(value.as_str().parse().unwrap()),
-        Rule::strings => {
-            ast::Value::List(value.into_inner()
-                .map(|s| ast::Value::StringLike(
-                    s.as_str().trim_matches('"').into()
-                ))
-                .collect()
-            )
-        }
-        Rule::integers => {
-            ast::Value::List(value.into_inner()
-                .map(|n| ast::Value::Numeric(
-                    n.as_str().parse().unwrap()
-                ))
-                .collect()
-            )
-        }
+        Rule::strings => ast::Value::List(
+            value
+                .into_inner()
+                .map(|s| ast::Value::StringLike(s.as_str().trim_matches('"').into()))
+                .collect(),
+        ),
+        Rule::integers => ast::Value::List(
+            value
+                .into_inner()
+                .map(|n| ast::Value::Numeric(n.as_str().parse().unwrap()))
+                .collect(),
+        ),
         _ => panic!("unreachable"),
     }
 }
