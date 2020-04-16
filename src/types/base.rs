@@ -31,8 +31,8 @@ pub struct StringLike<'a>(pub &'a [u8]);
 pub struct Numeric(pub u64);
 
 /// Over-arching pact type system
-#[cfg_attr(feature = "std", derive(Debug, PartialEq))]
-#[derive(Clone)]
+#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Clone, PartialEq)]
 pub enum PactType<'a> {
     StringLike(StringLike<'a>),
     Numeric(Numeric),
@@ -57,7 +57,7 @@ impl<'a> PactType<'a> {
                 }
             }
             PactType::List(l) => {
-                let mut buf_elements: Vec<u8> = vec![];
+                let mut buf_elements: Vec<u8> = Vec::<u8>::default();
                 for element in l {
                     match element {
                         PactType::StringLike(_) => element.encode(&mut buf_elements),
@@ -119,7 +119,7 @@ impl<'a> PactType<'a> {
                 Ok((n, 10usize))
             }
             2 => {
-                let mut values: Vec<PactType> = vec![];
+                let mut values: Vec<PactType> = Vec::<PactType>::default();
                 let mut remaining_length = data_length;
 
                 while remaining_length > 0 {
