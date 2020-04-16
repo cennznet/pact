@@ -174,6 +174,23 @@ mod tests {
     }
 
     #[test]
+    fn it_encodes_numeric_list() {
+        let l = PactType::List(vec![
+            PactType::Numeric(Numeric(0x0123456789abcdef)),
+            PactType::Numeric(Numeric(0xfedcba9876543210)),
+        ]);
+        let buf: &mut Vec<u8> = &mut Vec::new();
+        l.encode(buf);
+
+        let list_header: Vec<u8> = vec![2, 20];
+        let item_0: Vec<u8> = vec![1, 8, 0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01];
+        let item_1: Vec<u8> = vec![1, 8, 0x10, 0x32, 0x54, 0x76, 0x98, 0xba, 0xdc, 0xfe];
+        let mut expected: Vec<u8> = [list_header, item_0, item_1].concat();
+        expected = expected.into_iter().map(|b| b.swap_bits()).collect(); // convert to LE bit orders
+        assert_eq!(buf, &expected);
+    }
+
+    #[test]
     fn it_decodes_string_like() {
         let mut buf = vec![0, 11];
         buf = buf.into_iter().map(|b| b.swap_bits()).collect(); // convert to LE bit orders
