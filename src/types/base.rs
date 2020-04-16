@@ -85,27 +85,25 @@ impl<'a> PactType<'a> {
         };
 
         // 1 byte type ID + 1 byte length gives 2 offset
-        let read_offset = 2_usize;
+        let mut read_offset = 2_usize;
+
+        // Read length byte
+        let data_length = buf[1].swap_bits() as usize;
+        if data_length > buf[read_offset..].len() {
+            return Err("type length > buffer length");
+        }
 
         // Read type ID byte
         match buf[0].swap_bits() {
             0 => {
-                // Read length byte
-                let data_length = buf[1].swap_bits() as usize;
-                if data_length > buf[read_offset..].len() {
-                    return Err("type length > buffer length");
-                }
                 let read_length = read_offset + data_length;
                 let s = PactType::StringLike(StringLike(&buf[read_offset..read_length]));
                 Ok((s, read_length))
             }
             1 => {
                 let data_length = buf[1].swap_bits() as usize;
-                if data_length > 8 {
+                if data_length != 8 {
                     return Err("implementation only supports 64-bit numerics");
-                }
-                if buf[read_offset..].len() < 8 {
-                    return Err("type length > buffer length");
                 }
 
                 let n = PactType::Numeric(Numeric(u64::from_le_bytes([
@@ -119,6 +117,19 @@ impl<'a> PactType<'a> {
                     buf[9].swap_bits(),
                 ])));
                 Ok((n, 10usize))
+            }
+            2 => {
+                let mut values: Vec<PactType> = vec![];
+                let mut remaining_length = data_length;
+
+                while remaining_length > 0 {
+                    let (new_value, offset) = Self::decode(&buf[read_offset..])?;
+                    read_offset = read_offset + offset;
+                    remaining_length = remaining_length.checked_sub(offset)
+                        .ok_or("list length overflow")?;
+                    values.push(new_value);
+                }
+                Ok((PactType::List(values), read_offset))
             }
             _ => Err("unsupported type ID"),
         }
@@ -216,6 +227,43 @@ mod tests {
     }
 
     #[test]
+    fn it_decodes_string_lists() {
+        let list_header: Vec<u8> = vec![2, 35].into_iter().map(|b| b.swap_bits()).collect();
+        let str0_header: Vec<u8> = vec![0, 8].into_iter().map(|b| b.swap_bits()).collect();
+        let str1_header: Vec<u8> = vec![0, 9].into_iter().map(|b| b.swap_bits()).collect();
+        let str2_header: Vec<u8> = vec![0, 6].into_iter().map(|b| b.swap_bits()).collect();
+        let str3_header: Vec<u8> = vec![0, 4].into_iter().map(|b| b.swap_bits()).collect();
+
+        let buf: Vec<u8> = [
+            list_header,
+            str0_header,
+            b"you know".to_vec(),
+            str1_header,
+            b"the rules".to_vec(),
+            str2_header,
+            b"and so".to_vec(),
+            str3_header,
+            b"do I".to_vec(),
+        ].concat();
+
+        let (list_type, bytes_read) = PactType::decode(&buf).expect("it decodes");
+
+        let expected = PactType::List(vec![
+            PactType::StringLike(StringLike(b"you know")),
+            PactType::StringLike(StringLike(b"the rules")),
+            PactType::StringLike(StringLike(b"and so")),
+            PactType::StringLike(StringLike(b"do I")),
+        ]);
+
+        assert_eq!(
+            list_type,
+            expected,
+        );
+
+        assert_eq!(bytes_read, 37usize);
+    }
+
+    #[test]
     fn it_fails_with_missing_type_id() {
         assert_eq!(PactType::decode(&[]), Err("missing type ID byte"));
     }
@@ -234,6 +282,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "implementation only supports 64-bit numerics")]
     fn it_fails_with_u128_numeric() {
-        PactType::decode(&[1.swap_bits(), 16.swap_bits()]).unwrap();
+        PactType::decode(&[1.swap_bits(), 16.swap_bits(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).unwrap();
     }
 }

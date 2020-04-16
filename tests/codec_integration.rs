@@ -61,15 +61,15 @@ fn contract_binary_format_malformed_data_table() {
         Err(BinaryFormatErr::MalformedDataTable("missing type ID byte"))
     );
 
-    let mut bad_type_id = vec![0, 0b1000_0000, 0b0000_0001, 0b0000_0001];
+    let mut bad_type_id = vec![0, 0b1000_0000, 0b0000_0001, 0b0000_0000];
     assert_eq!(
         Contract::decode(&mut bad_type_id),
         Err(BinaryFormatErr::MalformedDataTable("unsupported type ID"))
     );
 
-    let mut numeric_too_large = vec![0, 0b1000_0000, 0b1000_0000, 0b0000_1111];
+    let mut numeric_too_small = vec![0, 0b1000_0000, 0b1000_0000, 0b0100_0000, 0, 0];
     assert_eq!(
-        Contract::decode(&mut numeric_too_large),
+        Contract::decode(&mut numeric_too_small),
         Err(BinaryFormatErr::MalformedDataTable(
             "implementation only supports 64-bit numerics"
         ))
