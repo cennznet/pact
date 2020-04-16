@@ -38,18 +38,19 @@ lt = { "less than" }
 lte = { "less than or equal to" }
 gt = { "greater than" }
 gte = { "greater than or equal to" }
-comparator = _{ eq | gte | gt | lte | lt }
-
+element_of = { "one of" }
+comparator = _{ eq | gte | gt | lte | lt | element_of }
 assertion = { subject ~ imperative ~ comparator ~ subject ~ (conjunction ~ assertion)? }
 definition = { "define" ~ identifier ~ "as" ~ value }
 
 // Variables
 subject = _{ value | identifier }
-value = { string | integer }
+value = { string | integer | strings | integers }
 integer = @{ ASCII_DIGIT+ }
 string = { quote ~ ASCII_ALPHANUMERIC+ ~ quote }
+integers = { "[" ~ integer ~ ("," ~ integer)* ~ "]" }
+strings = { "[" ~ string ~ ("," ~ string)* ~ "]" }
 identifier = @{ dollar ~ ASCII_ALPHA+ ~ (ASCII_ALPHANUMERIC)* }
 dollar = _{ "$" }
 quote = _{ "\"" }
-
 WHITESPACE = _{ " " | "\t" | NEWLINE }

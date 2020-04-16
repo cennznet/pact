@@ -66,6 +66,7 @@ pub enum Comparator {
     GreaterThanOrEqual,
     LessThan,
     LessThanOrEqual,
+    OneOf,
 }
 
 /// A subject of a comparator (LHS / RHS).
@@ -81,6 +82,7 @@ pub enum Subject {
 pub enum Value {
     StringLike(String),
     Numeric(u64),
+    List(Vec<Value>)
 }
 
 pub type Identifier = String;
