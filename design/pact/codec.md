@@ -19,9 +19,9 @@ length: 1 LE byte
 data: <length> LE bytes
 ```
 
-`List` structs are slightly more complex where the internals are another pact type.
+`List` structs contain a list of `PactType` structs.
 
-For example, a List of three strings would be encoded to:
+For example, a `List` of three `StringLike` structs are encoded to:
 
 ```
 type index: 2 = List
