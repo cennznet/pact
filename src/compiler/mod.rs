@@ -27,6 +27,7 @@ pub enum CompileErr {
     UndeclaredVar(ast::Identifier),
     /// A parameter with the same identifier has already been declared
     Redeclared,
+    InvalidListElement,
 }
 
 /// Compile a pact contract AST into bytecode
@@ -67,6 +68,19 @@ pub fn compile(ir: &[ast::Node]) -> Result<Contract, CompileErr> {
                 let v = match value {
                     ast::Value::Numeric(n) => PactType::Numeric(Numeric(*n)),
                     ast::Value::StringLike(s) => PactType::StringLike(StringLike(s.as_bytes())),
+                    ast::Value::List(l) => {
+                        let mut list = Vec::<PactType>::with_capacity(l.len());
+                        for element in l {
+                            list.push(match element {
+                                ast::Value::Numeric(n) => PactType::Numeric(Numeric(*n)),
+                                ast::Value::StringLike(s) => {
+                                    PactType::StringLike(StringLike(s.as_bytes()))
+                                }
+                                _ => return Err(CompileErr::InvalidListElement),
+                            })
+                        }
+                        PactType::List(list)
+                    }
                 };
                 compiler.data_table.push(v)
             }
@@ -145,6 +159,7 @@ impl<'a> Compiler<'a> {
                 let v = match value {
                     ast::Value::Numeric(n) => PactType::Numeric(Numeric(*n)),
                     ast::Value::StringLike(s) => PactType::StringLike(StringLike(s.as_bytes())),
+                    ast::Value::List(_) => panic!("Invalid subject"),
                 };
                 self.data_table.push(v);
                 Ok(OpCode::LD_USER((self.data_table.len() as u8) - 1))
@@ -179,5 +194,6 @@ fn compile_comparator(comparator: &ast::Comparator) -> Result<OpCode, CompileErr
         ast::Comparator::GreaterThanOrEqual => OpCode::GTE,
         ast::Comparator::LessThan => OpCode::LT,
         ast::Comparator::LessThanOrEqual => OpCode::LTE,
+        ast::Comparator::OneOf => OpCode::IN,
     })
 }

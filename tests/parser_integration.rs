@@ -50,3 +50,47 @@ fn it_parses() {
     .unwrap();
     println!("{:?}", ast);
 }
+
+#[test]
+fn it_parses_an_integer_list() {
+    let _ = parser::parse(
+        "given parameters $charlie, $tango, $delta 1337 must be one of [1, 2, 3, 4, 5]",
+    )
+    .unwrap();
+
+    let _ = parser::parse(
+        "
+      given parameters $charlie, $tango, $delta
+      define $list as [1, 2, 3, 4, 5]
+      $delta must be one of $list",
+    )
+    .unwrap();
+}
+
+#[test]
+fn it_parses_a_string_list() {
+    let _ = parser::parse(
+        "given parameters $rick, $astley \"Never\" must be one of [\"Never\", \"gonna\"]",
+    )
+    .unwrap();
+
+    let _ = parser::parse(
+        "
+      given parameters $rick, $astley
+      define $list as [\"You know\", \"the rules\", \"and so do I\"]
+      $rick must be one of $list",
+    )
+    .unwrap();
+}
+
+#[test]
+#[should_panic]
+fn it_fails_when_parsing_a_mixed_list() {
+    let _ = parser::parse(
+        "
+      given parameters $rick, $astley
+      define $list as [\"Your hearts been aching but youre\", 2, \"shy to say it\"]
+      $rick must be one of $list",
+    )
+    .unwrap();
+}
