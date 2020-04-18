@@ -1,82 +1,108 @@
 # Pact Byte Code
-Pact byte code is a DSL for expressing logical assertions on dynamic input data.  
-The assertions can be independent or linked to form more complex clauses ('and, or').  
-Pact's goal is to be an embedded DSL for constraining the use of doughnut certificates.  
-Attaching pact bytecode to a doughnut can be thought of as attaching contractual "terms of use".  
+Pact byte code is a DSL for expressing logical assertions on dynamic input data.
+The assertions can be independent or linked to form more complex clauses ('and, or').
+Pact's goal is to be an embedded DSL for constraining the use of doughnut certificates.
+Attaching pact bytecode to a doughnut can be thought of as attaching contractual "terms of use".
 It is the pact interpreters job to resolve whether the clauses were maintained or not given
-some input data.  
+some input data.
 
 ## Grammar
-The syntax of pact byte code is organized so that interpretation requires zero look-ahead.  
-To acheive this, the language's opcodes are split into 3 loose categories: loads, conjunctions, and comparators.  
-- Comparators: express a logical comparison between two things  
-- Conjunctions: express a logical join between comparators  
+The syntax of pact byte code is organized so that interpretation requires zero look-ahead.
+To acheive this, the language's opcodes are split into 3 loose categories: loads, conjunctions, and comparators.
+- Comparators: express a logical comparison between two things
+- Conjunctions: express a logical join between comparators
 - Load: Load data from a register for comparison
 
 ```
 CONTRACT: CLAUSE*
 CLAUSE: ASSERTION*
-ASSERTION: COMPARATOR LOAD LOAD | ASSERTION CONJUNCTION ASSERTION
-CONJUNCTION: AND | OR | XOR
-COMPARATOR: EQ | GT | GTE | LT | LTE | IN
-LOAD: LD_INPUT | LD_USER
+ASSERTION: COMPARATOR LOAD_INDEX LOAD_INDEX | ASSERTION CONJUNCTION ASSERTION
+CONJUNCTION: (INVERSION + CONJUNCTION_OP)
+COMPARATOR: (INVERSION + LOAD + COMPARATOR_OP)
+INVERSION: NORMAL | NOT
+CONJUNCTION_OP: AND | OR | XOR
+LOAD: LOAD_INPUT_VS_USER | LD_INPUT_VS_INPUT
+COMPARATOR_OP: EQ | GT | GTE | IN
 ```
 
-Goals:  
+Goals:
 - Embed within doughnuts (compact)
 - Executable by the pact interpreter
 
 ## OpCodes
-8-bit big endian opcode  
-  - 6 high bits: index  
-  - 2 low bits: reserved  
+8-bit big endian opcode:
 
-comparator and conjunction opcodes are stand-alone 8bit.  
-load opcodes are followed by an 8bit index of the datum to load from the target table.  
+| bits    | 7           | 6   |      5 - 2 |    1 - 0 |
+|:--------|:-----------:|:---:|:----------:|:--------:|
+| purpose | conjunction | not |  operation | RESERVED |
 
-```rust
-// Load a datum from the input data table into the next free register
-LD_INPUT = 0
-// Load a datum from the user data table into the next free register
-LD_USER = 1
-/* Conjunctions */
-// Compute a logical and between A and the next comparator OpCode
-AND = 2
-// Compute an inclusive or between A and the next comparator OpCode
-OR = 3
-// Compute an exclusive or between A and the next comparator OpCode
-XOR = 4
-/* Comparators */
-// i == j
-EQ = 5
-// i > j
-GT = 6
-// i >= j
-GTE = 7
-// Whether data[i] is included in the set at data[j]
-IN = 8
-// i < j
-LT = 9
-// i <= j
-LTE = 10
-```
+  - `bit(7)` determines whether the opcode is a conjunction or a comparator
+    ```rust
+      // OpCode represents a comparator
+      COMP = 0
+      // OpCode represents a conjunction
+      CONJ = 1
+    ```
+  - `bit(6)` determines whether a NOT is applied to the conjunction/comparator
+    ```rust
+      // No logical inversion
+      NORMAL = 0
+      // Invert the logic of the output
+      NOT = 1
+    ```
+  - `bits(5..2)` (4 bits):
+    - for comparators (`bit(7) == 0`):
+      | bits    |    5 |      4 - 2 |
+      |:--------|-----:|-----------:|
+      | purpose | load | comparator |
+      - `bit(5)` determines the LOADs to compare:
+        ```rust
+        // Compare from input to datatable entries
+        LOAD_INPUT_VS_USER = 0;
+        // Compare from input to input entries
+        LOAD_INPUT_VS_INPUT = 1;
+        ```
+      - `bits(4..2)` determines the comparator operation
+        ```rust
+        // i == j
+        EQ = 0
+        // i > j
+        GT = 1
+        // i >= j
+        GTE = 2
+        // Whether data[i] is included in the set at data[j]
+        IN = 3
+        ```
+        *Note: `LT` and `LTE` are achieved by using `bit(6)`, the `NOT` operator.*
+    - for conjunctions (`bit(7) == 1`):
+      ```rust
+      // Compute a logical and between A and the next comparator OpCode
+      AND = 0
+      // Compute an inclusive or between A and the next comparator OpCode
+      OR = 1
+      // Compute an exclusive or between A and the next comparator OpCode
+      XOR = 2
+      ```
+  - `bits(1..0)` are RESERVED
+
 
 ## Example Syntax
 
 A series of independent clauses ("implicit and")
 ```pact
-EQ LD_INPUT 0 LD_USER 1
-GT LD_INPUT 2 LD_USER 2
-LT LD_INPUT 1 LD_USER 0 
+(COMP + LOAD_INPUT_VS_USER + EQ) 0 1            # INPUT(0) == USER(1)    | 0x00, 0x00, 0x01
+(COMP + LOAD_INPUT_VS_USER + GT) 0 1            # INPUT(0) >  USER(1)    | 0x04, 0x00, 0x01
+(COMP + NOT + LOAD_INPUT_VS_USER + GTE) 0 1     # INPUT(0) <  USER(1)    | 0x48, 0x00, 0x01
 ```
+*Values in brackets represent a single byte (3-bytes per independent clause)*
 
-A multi-assertion clause followed by a single clause (one assertion)  
+A multi-assertion clause followed by a single clause (one assertion)
 ```pact
-GT LD_INPUT 0 LD_USER 1
-AND
-EQ LD_INPUT 0 LD_USER 2
-OR
-LT LD_INPUT 1 LD_USER 3
+(COMP + LOAD_INPUT_VS_USER + GT) 0 1            # INPUT(0) >  USER(1)    | 0x04, 0x00, 0x01
+(CONJ + NOT + AND)                              #  NAND                  | 0xC0
+(COMP + LOAD_INPUT_VS_USER + EQ) 0 2            # INPUT(0) == USER(2)    | 0x00, 0x00, 0x02
+(CONJ + OR)                                     #  OR                    | 0x84
+(COMP + NOT + LOAD_INPUT_VS_INPUT + GTE) 1 3    # INPUT(1) <  INPUT(3)   | 0x68, 0x01, 0x03
 # A single clause
-GTE LD_INPUT 0 LD_USER 3
+(COMP + LOAD_INPUT_VS_USER + GTE) 0 3           # INPUT(0) >= USER(3)    | 0x08, 0x00, 0x03
 ```
