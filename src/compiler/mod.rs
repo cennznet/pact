@@ -14,11 +14,16 @@
 //   <https://centrality.ai/licenses/gplv3.txt>
 //   <https://centrality.ai/licenses/lgplv3.txt>
 
-use crate::interpreter::OpCode;
+use crate::interpreter::{Comparator, OpCode, OpComp, OpConj, OpInvert, OpLoad, OpType};
 use crate::parser::ast;
 use crate::types::{Contract, DataTable, Numeric, PactType, StringLike};
 
 use hashbrown::HashMap;
+
+pub enum LoadSource {
+    Input,
+    DataTable,
+}
 
 /// Compilation error
 #[derive(Debug)]
@@ -28,6 +33,7 @@ pub enum CompileErr {
     /// A parameter with the same identifier has already been declared
     Redeclared,
     InvalidListElement,
+    InvalidCompare,
 }
 
 /// Compile a pact contract AST into bytecode
@@ -116,28 +122,65 @@ impl<'a> Compiler<'a> {
 
     /// Compile an assertion AST node
     fn compile_assertion(&mut self, assertion: &'a ast::Assertion) -> Result<(), CompileErr> {
-        let comparator_op = compile_comparator(&assertion.2)?;
-        self.bytecode.push(comparator_op.into());
+        let lhs_load = self.compile_subject(&assertion.0)?;
+        let (comparator_op, invert) = compile_comparator(&assertion.1, &assertion.2)?;
+        let rhs_load = self.compile_subject(&assertion.3)?;
 
-        let lhs_load_op = self.compile_subject(&assertion.0)?;
-        match lhs_load_op {
-            OpCode::LD_INPUT(index) | OpCode::LD_USER(index) => {
-                self.bytecode.push(lhs_load_op.into());
-                self.bytecode.push(index);
-            }
-            _ => panic!("unreachable"),
+        // Step 1 - Determine load order
+        let (load, flip) = match lhs_load.1 {
+            LoadSource::Input => match rhs_load.1 {
+                LoadSource::Input => (OpLoad::INPUT_VS_INPUT, false),
+                LoadSource::DataTable => (OpLoad::INPUT_VS_USER, false),
+            },
+            LoadSource::DataTable => match rhs_load.1 {
+                LoadSource::Input => (OpLoad::INPUT_VS_USER, true),
+                _ => return Err(CompileErr::InvalidCompare),
+            },
         };
 
-        // TODO: Imperative is ignored for now. In future it will set/flip the truthiness of the comparator op
-
-        let rhs_load_op = self.compile_subject(&assertion.3)?;
-        match rhs_load_op {
-            OpCode::LD_INPUT(index) | OpCode::LD_USER(index) => {
-                self.bytecode.push(rhs_load_op.into());
-                self.bytecode.push(index);
-            }
-            _ => panic!("unreachable"),
+        let indices: [u8; 2] = if flip {
+            [rhs_load.0, lhs_load.0]
+        } else {
+            [lhs_load.0, rhs_load.0]
         };
+
+        let (comparator_op, invert) = if flip {
+            match comparator_op {
+                OpComp::EQ => (comparator_op, invert),
+                OpComp::IN => (comparator_op, invert),
+                OpComp::GT => {
+                    // Convert to LT
+                    let invert = match invert {
+                        OpInvert::NORMAL => OpInvert::NOT,
+                        OpInvert::NOT => OpInvert::NORMAL,
+                    };
+                    (OpComp::GTE, invert)
+                }
+                OpComp::GTE => {
+                    // Convert to LTE
+                    let invert = match invert {
+                        OpInvert::NORMAL => OpInvert::NOT,
+                        OpInvert::NOT => OpInvert::NORMAL,
+                    };
+                    (OpComp::GT, invert)
+                }
+            }
+        } else {
+            (comparator_op, invert)
+        };
+
+        let op = OpCode {
+            op_type: OpType::COMP(Comparator {
+                load: load,
+                op: comparator_op,
+                indices: indices,
+            }),
+            invert: invert,
+        };
+
+        self.bytecode.push(op.into());
+        self.bytecode.push(indices[0]);
+        self.bytecode.push(indices[1]);
 
         if let Some((conjunctive, conjoined_assertion)) = &assertion.4 {
             self.bytecode
@@ -149,7 +192,10 @@ impl<'a> Compiler<'a> {
     }
 
     /// Compile a subject AST node
-    fn compile_subject(&mut self, subject: &'a ast::Subject) -> Result<OpCode, CompileErr> {
+    fn compile_subject(
+        &mut self,
+        subject: &'a ast::Subject,
+    ) -> Result<(u8, LoadSource), CompileErr> {
         // `subject` could be a literal value or an identifier
         // A literal value should be stored in the user data table
         // An identifier should have been declared or it is an error
@@ -162,15 +208,15 @@ impl<'a> Compiler<'a> {
                     ast::Value::List(_) => panic!("Invalid subject"),
                 };
                 self.data_table.push(v);
-                Ok(OpCode::LD_USER((self.data_table.len() as u8) - 1))
+                Ok(((self.data_table.len() as u8) - 1, LoadSource::DataTable))
             }
             ast::Subject::Identifier(ident) => {
                 // Try lookup this var `ident` in the known input and user data tables
                 if let Some(index) = self.input_var_index.get(ident) {
-                    return Ok(OpCode::LD_INPUT(*index));
+                    return Ok((*index, LoadSource::Input));
                 }
                 if let Some(index) = self.user_var_index.get(ident) {
-                    return Ok(OpCode::LD_USER(*index));
+                    return Ok((*index, LoadSource::DataTable));
                 }
                 Err(CompileErr::UndeclaredVar(ident.to_string()))
             }
@@ -181,20 +227,45 @@ impl<'a> Compiler<'a> {
 /// Compile a conjunction AST node
 fn compile_conjunctive(conjunctive: &ast::Conjunctive) -> Result<OpCode, CompileErr> {
     Ok(match conjunctive {
-        ast::Conjunctive::And => OpCode::AND,
-        ast::Conjunctive::Or => OpCode::OR,
+        ast::Conjunctive::And => OpCode {
+            op_type: OpType::CONJ(OpConj::AND),
+            invert: OpInvert::NORMAL,
+        },
+        ast::Conjunctive::Or => OpCode {
+            op_type: OpType::CONJ(OpConj::OR),
+            invert: OpInvert::NORMAL,
+        },
     })
 }
 
 /// Compile a comparator AST node
-fn compile_comparator(comparator: &ast::Comparator) -> Result<OpCode, CompileErr> {
+fn compile_comparator(
+    imperative: &ast::Imperative,
+    comparator: &ast::Comparator,
+) -> Result<(OpComp, OpInvert), CompileErr> {
+    let invert: OpInvert = match imperative {
+        ast::Imperative::MustBe => OpInvert::NORMAL,
+        ast::Imperative::MustNotBe => OpInvert::NOT,
+    };
     Ok(match comparator {
-        ast::Comparator::Equal => OpCode::EQ,
-        ast::Comparator::GreaterThan => OpCode::GT,
-        ast::Comparator::GreaterThanOrEqual => OpCode::GTE,
-        ast::Comparator::LessThan => OpCode::LT,
-        ast::Comparator::LessThanOrEqual => OpCode::LTE,
-        ast::Comparator::OneOf => OpCode::IN,
+        ast::Comparator::Equal => (OpComp::EQ, invert),
+        ast::Comparator::GreaterThan => (OpComp::GT, invert),
+        ast::Comparator::GreaterThanOrEqual => (OpComp::GTE, invert),
+        ast::Comparator::LessThan => {
+            let invert = match invert {
+                OpInvert::NORMAL => OpInvert::NOT,
+                OpInvert::NOT => OpInvert::NORMAL,
+            };
+            (OpComp::GTE, invert)
+        }
+        ast::Comparator::LessThanOrEqual => {
+            let invert = match invert {
+                OpInvert::NORMAL => OpInvert::NOT,
+                OpInvert::NOT => OpInvert::NORMAL,
+            };
+            (OpComp::GT, invert)
+        }
+        ast::Comparator::OneOf => (OpComp::IN, invert),
     })
 }
 
