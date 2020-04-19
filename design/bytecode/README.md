@@ -85,24 +85,33 @@ Goals:
       ```
   - `bits(1..0)` are RESERVED
 
+## Index Codes
+
+A Pact may have up to 16 input arguments and up to 16 entries in a user data table.
+
+This limitation allows comparator indices to be encoded in a single byte:
+
+| bits    |      7 - 4 |     3 - 0 |
+|:--------|:----------:|:---------:|
+| purpose |  LHS index | RHS index |
 
 ## Example Syntax
 
 A series of independent clauses ("implicit and")
 ```pact
-(COMP + LOAD_INPUT_VS_USER + EQ) 0 1            # INPUT(0) == USER(1)    | 0x00, 0x00, 0x01
-(COMP + LOAD_INPUT_VS_USER + GT) 0 1            # INPUT(0) >  USER(1)    | 0x04, 0x00, 0x01
-(COMP + NOT + LOAD_INPUT_VS_USER + GTE) 0 1     # INPUT(0) <  USER(1)    | 0x48, 0x00, 0x01
+(COMP + LOAD_INPUT_VS_USER + EQ) ((0 << 4) + 1)            # INPUT(0) == USER(1)    | 0x00, 0x01
+(COMP + LOAD_INPUT_VS_USER + GT) ((0 << 4) + 1)            # INPUT(0) >  USER(1)    | 0x04, 0x01
+(COMP + NOT + LOAD_INPUT_VS_USER + GTE) ((0 << 4) + 1)     # INPUT(0) <  USER(1)    | 0x48, 0x01
 ```
 *Values in brackets represent a single byte (3-bytes per independent clause)*
 
 A multi-assertion clause followed by a single clause (one assertion)
 ```pact
-(COMP + LOAD_INPUT_VS_USER + GT) 0 1            # INPUT(0) >  USER(1)    | 0x04, 0x00, 0x01
-(CONJ + NOT + AND)                              #  NAND                  | 0xC0
-(COMP + LOAD_INPUT_VS_USER + EQ) 0 2            # INPUT(0) == USER(2)    | 0x00, 0x00, 0x02
-(CONJ + OR)                                     #  OR                    | 0x84
-(COMP + NOT + LOAD_INPUT_VS_INPUT + GTE) 1 3    # INPUT(1) <  INPUT(3)   | 0x68, 0x01, 0x03
+(COMP + LOAD_INPUT_VS_USER + GT) ((0 << 4) + 1)            # INPUT(0) >  USER(1)    | 0x04, 0x01
+(CONJ + NOT + AND)                                         #  NAND                  | 0xC0
+(COMP + LOAD_INPUT_VS_USER + EQ) ((0 << 4) + 2)            # INPUT(0) == USER(2)    | 0x00, 0x02
+(CONJ + OR)                                                #  OR                    | 0x84
+(COMP + NOT + LOAD_INPUT_VS_INPUT + GTE) ((1 << 4) + 3)    # INPUT(1) <  INPUT(3)   | 0x68, 0x13
 # A single clause
-(COMP + LOAD_INPUT_VS_USER + GTE) 0 3           # INPUT(0) >= USER(3)    | 0x08, 0x00, 0x03
+(COMP + LOAD_INPUT_VS_USER + GTE) ((0 << 4) + 3)           # INPUT(0) >= USER(3)    | 0x08, 0x03
 ```

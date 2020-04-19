@@ -26,6 +26,12 @@ const OP_LOAD_MASK: u8 = 0b0000_1000;
 const OP_CONJ_MASK: u8 = 0b0000_1111;
 const OP_COMP_MASK: u8 = 0b0000_0111;
 
+pub const INDEX_LHS_MASK: u8 = 0b1111_0000;
+pub const INDEX_RHS_MASK: u8 = 0b0000_1111;
+
+pub const INDEX_LHS_SHIFT: usize = 4;
+pub const INDEX_RHS_SHIFT: usize = 0;
+
 /// Interpret some pact byte code (`source`) with input data registers (`input_data`) and
 /// user data registers (`user_data`).
 /// Returns a boolean indicating whether the pact contract was validated or not,
@@ -89,7 +95,15 @@ pub struct OpCode {
 pub struct Comparator {
     pub load: OpLoad,
     pub op: OpComp,
-    pub indices: [u8; 2],
+    pub indices: OpIndices,
+}
+
+/// Comparator OpCode Structure
+#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Clone, Copy)]
+pub struct OpIndices {
+    pub lhs: u8,
+    pub rhs: u8,
 }
 
 /// Enum to select OpCode Type
@@ -179,20 +193,21 @@ impl OpCode {
                     _ => return Err(InterpErr::InvalidOpCode(*index)),
                 };
                 // Load indices from the stream
-                let mut indices: [u8; 2] = [0; 2];
-                for x in 0..2 {
-                    indices[x] = if let Some(i) = stream.next() {
-                        Ok(*i)
-                    } else {
-                        Err(InterpErr::UnexpectedEOI("expected index"))
-                    }?;
-                }
+                let indices = if let Some(i) = stream.next() {
+                    Ok(*i)
+                } else {
+                    Err(InterpErr::UnexpectedEOI("expected index"))
+                }?;
+
                 // form and return the comparator OpCode
                 Ok(Some(OpCode {
                     op_type: OpType::COMP(Comparator {
                         load: load,
                         op: op,
-                        indices: indices,
+                        indices: OpIndices {
+                            lhs: (indices & INDEX_LHS_MASK) >> INDEX_LHS_SHIFT,
+                            rhs: (indices & INDEX_RHS_MASK) >> INDEX_RHS_SHIFT,
+                        },
                     }),
                     invert: invert,
                 }))
@@ -267,6 +282,13 @@ impl Into<u8> for OpType {
                 OP_TYPE_MASK | conj_u8
             }
         }
+    }
+}
+
+impl Into<u8> for OpIndices {
+    fn into(self) -> u8 {
+        (self.lhs << INDEX_LHS_SHIFT) & INDEX_LHS_MASK
+            | (self.rhs << INDEX_RHS_SHIFT) & INDEX_RHS_MASK
     }
 }
 
@@ -365,18 +387,18 @@ impl<'a> Interpreter<'a> {
                 // Gather left and right hand side values
                 let lhs = self
                     .input_data
-                    .get(comparator.indices[0] as usize)
-                    .ok_or(InterpErr::MissingIndex(comparator.indices[0]))?;
+                    .get(comparator.indices.lhs as usize)
+                    .ok_or(InterpErr::MissingIndex(comparator.indices.lhs))?;
 
                 let rhs = match comparator.load {
                     OpLoad::INPUT_VS_USER => self
                         .user_data
-                        .get(comparator.indices[1] as usize)
-                        .ok_or(InterpErr::MissingIndex(comparator.indices[1])),
+                        .get(comparator.indices.rhs as usize)
+                        .ok_or(InterpErr::MissingIndex(comparator.indices.rhs)),
                     OpLoad::INPUT_VS_INPUT => self
                         .input_data
-                        .get(comparator.indices[1] as usize)
-                        .ok_or(InterpErr::MissingIndex(comparator.indices[1])),
+                        .get(comparator.indices.rhs as usize)
+                        .ok_or(InterpErr::MissingIndex(comparator.indices.rhs)),
                 }?;
 
                 let mut result = eval_comparator(comparator.op, op.invert, &lhs, rhs)?;

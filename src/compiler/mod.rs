@@ -14,7 +14,7 @@
 //   <https://centrality.ai/licenses/gplv3.txt>
 //   <https://centrality.ai/licenses/lgplv3.txt>
 
-use crate::interpreter::{Comparator, OpCode, OpComp, OpConj, OpInvert, OpLoad, OpType};
+use crate::interpreter::{Comparator, OpCode, OpComp, OpConj, OpIndices, OpInvert, OpLoad, OpType};
 use crate::parser::ast;
 use crate::types::{Contract, DataTable, Numeric, PactType, StringLike};
 
@@ -25,8 +25,10 @@ pub enum LoadSource {
     DataTable,
 }
 
+const MAX_ENTRIES: usize = 16;
+
 /// Compilation error
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CompileErr {
     /// The identifier used is not declared
     UndeclaredVar(ast::Identifier),
@@ -35,6 +37,10 @@ pub enum CompileErr {
     InvalidListElement,
     /// Comparing user data table entries is not valid
     InvalidCompare,
+    /// Data table is full
+    DataTableFull,
+    /// Too Many Input arguments
+    TooManyInputs,
 }
 
 /// Compile a pact contract AST into bytecode
@@ -51,6 +57,9 @@ pub fn compile(ir: &[ast::Node]) -> Result<Contract, CompileErr> {
     for node in ir.iter() {
         match node {
             ast::Node::InputDeclaration(idents) => {
+                if idents.len() > MAX_ENTRIES {
+                    return Err(CompileErr::TooManyInputs);
+                }
                 for (index, ident) in idents.iter().enumerate() {
                     compiler
                         .input_var_index
@@ -89,7 +98,7 @@ pub fn compile(ir: &[ast::Node]) -> Result<Contract, CompileErr> {
                         PactType::List(list)
                     }
                 };
-                compiler.data_table.push(v)
+                compiler.push_to_datatable(v)?;
             }
         }
     }
@@ -121,6 +130,15 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    fn push_to_datatable(&mut self, value: PactType<'a>) -> Result<(), CompileErr> {
+        self.data_table.push(value);
+        if self.data_table.len() > MAX_ENTRIES {
+            Err(CompileErr::DataTableFull)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Compile an assertion AST node
     fn compile_assertion(&mut self, assertion: &'a ast::Assertion) -> Result<(), CompileErr> {
         let lhs_load = self.compile_subject(&assertion.0)?;
@@ -141,10 +159,16 @@ impl<'a> Compiler<'a> {
 
         // Check whether we need to flip the load indices
         // to meet the load order
-        let indices: [u8; 2] = if flip {
-            [rhs_load.0, lhs_load.0]
+        let indices = if flip {
+            OpIndices {
+                lhs: rhs_load.0,
+                rhs: lhs_load.0,
+            }
         } else {
-            [lhs_load.0, rhs_load.0]
+            OpIndices {
+                lhs: lhs_load.0,
+                rhs: rhs_load.0,
+            }
         };
 
         // A flip means we need to redefine inequalities
@@ -183,8 +207,7 @@ impl<'a> Compiler<'a> {
             invert: invert,
         };
         self.bytecode.push(op.into());
-        self.bytecode.push(indices[0]);
-        self.bytecode.push(indices[1]);
+        self.bytecode.push(indices.into());
 
         // Handle conjunction if it exists
         if let Some((conjunctive, conjoined_assertion)) = &assertion.4 {
@@ -212,7 +235,7 @@ impl<'a> Compiler<'a> {
                     ast::Value::StringLike(s) => PactType::StringLike(StringLike(s.as_bytes())),
                     ast::Value::List(_) => panic!("Invalid subject"),
                 };
-                self.data_table.push(v);
+                self.push_to_datatable(v)?;
                 Ok(((self.data_table.len() as u8) - 1, LoadSource::DataTable))
             }
             ast::Subject::Identifier(ident) => {
