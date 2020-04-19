@@ -74,6 +74,8 @@ pub enum InterpErr {
     Refused,
 }
 
+/// Data structure which breaks down the anatomy of an OpCode
+/// - implements `Into<u8>`
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Clone, Copy)]
 pub struct OpCode {
@@ -81,6 +83,7 @@ pub struct OpCode {
     pub invert: OpInvert,
 }
 
+/// Comparator OpCode Structure
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Clone, Copy)]
 pub struct Comparator {
@@ -89,11 +92,7 @@ pub struct Comparator {
     pub indices: [u8; 2],
 }
 
-/// A pact instruction code
-///
-/// Big Endian OpCodes
-/// - 6 bit OpCode index
-/// - 2 bit reserved
+/// Enum to select OpCode Type
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Clone, Copy)]
@@ -104,6 +103,8 @@ pub enum OpType {
     CONJ(OpConj),
 }
 
+/// Enum to determine whether a comparator OpCode
+/// should invert the result or not
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Clone, Copy)]
@@ -112,6 +113,8 @@ pub enum OpInvert {
     NOT,
 }
 
+/// Enum to determine whether a comparator OpCode
+/// is comparing input to datatable or input to input
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Clone, Copy)]
@@ -120,6 +123,7 @@ pub enum OpLoad {
     INPUT_VS_INPUT,
 }
 
+/// Enum of avaliable comparator OpCode operations
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Clone, Copy)]
@@ -130,6 +134,7 @@ pub enum OpComp {
     IN,
 }
 
+/// Enum of avaliable conjunction OpCode operations
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Clone, Copy)]
@@ -150,18 +155,22 @@ impl OpCode {
 
         let index = op_index.unwrap();
 
+        // Check if the invert Bit is Set
         let invert = match index & OP_INVERT_MASK {
             0 => OpInvert::NORMAL,
             _ => OpInvert::NOT,
         };
 
+        // Check the Type of OpCode (0 ? comparator : conjunction)
         match index & OP_TYPE_MASK {
             0 => {
                 // Comparator
+                // Determine load type
                 let load = match index & OP_LOAD_MASK {
                     0 => OpLoad::INPUT_VS_USER,
                     _ => OpLoad::INPUT_VS_INPUT,
                 };
+                // Determine comparator operation
                 let op = match index & OP_COMP_MASK {
                     0 => OpComp::EQ,
                     1 => OpComp::GT,
@@ -169,6 +178,7 @@ impl OpCode {
                     3 => OpComp::IN,
                     _ => return Err(InterpErr::InvalidOpCode(*index)),
                 };
+                // Load indices from the stream
                 let mut indices: [u8; 2] = [0; 2];
                 for x in 0..2 {
                     indices[x] = if let Some(i) = stream.next() {
@@ -177,6 +187,7 @@ impl OpCode {
                         Err(InterpErr::UnexpectedEOI("expected index"))
                     }?;
                 }
+                // form and return the comparator OpCode
                 Ok(Some(OpCode {
                     op_type: OpType::COMP(Comparator {
                         load: load,
@@ -194,6 +205,7 @@ impl OpCode {
                     2 => OpConj::XOR,
                     _ => return Err(InterpErr::InvalidOpCode(*index)),
                 };
+                // form and return the comparator OpCode
                 Ok(Some(OpCode {
                     op_type: OpType::CONJ(op),
                     invert: invert,
@@ -296,6 +308,7 @@ fn eval_comparator(
         _ => Err(InterpErr::TypeMismatch),
     }?;
 
+    // Apply inversion if required
     match invert {
         OpInvert::NOT => Ok(!value),
         _ => Ok(value),
@@ -314,6 +327,8 @@ fn eval_conjunction(
         OpConj::OR => lhs | rhs,
         OpConj::XOR => lhs ^ rhs,
     };
+
+    // Apply inversion if required
     Ok(match invert {
         OpInvert::NORMAL => value,
         OpInvert::NOT => !value,
@@ -341,9 +356,13 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn evaluate_comparator(&mut self, op: OpCode) -> Result<(), InterpErr> {
+    /// Executes a comparator OpCode
+    /// This belongs to the interpreter state machine and will update state
+    /// based on the outcome
+    fn execute_comparator(&mut self, op: OpCode) -> Result<(), InterpErr> {
         match op.op_type {
             OpType::COMP(comparator) => {
+                // Gather left and right hand side values
                 let lhs = self
                     .input_data
                     .get(comparator.indices[0] as usize)
@@ -362,6 +381,7 @@ impl<'a> Interpreter<'a> {
 
                 let mut result = eval_comparator(comparator.op, op.invert, &lhs, rhs)?;
 
+                // Evaluate the conjunction if necessary
                 match &self.state {
                     State::Conjunctive {
                         last_assertion,
@@ -372,10 +392,6 @@ impl<'a> Interpreter<'a> {
                     }
                     _ => {}
                 };
-                // A conjunction is also pending, apply it, merging the last and current result.
-                // if let Some((last_assertion, conjunction, invert)) = conjunction_check {
-                //     result = eval_conjunction(conjunction, invert, last_assertion, result)?;
-                // }
 
                 // The assertions and operations upto this point have all been collapsed into
                 // a single boolean.
@@ -390,11 +406,13 @@ impl<'a> Interpreter<'a> {
         }
     }
 
+    /// Interpreter state machine
     pub fn interpret(&mut self, op: OpCode) -> Result<(), InterpErr> {
         match &self.state {
-            State::Initial => self.evaluate_comparator(op),
+            // First op code must be a comparator
+            State::Initial => self.execute_comparator(op),
             State::AssertionTrue => match op.op_type {
-                OpType::COMP(_) => self.evaluate_comparator(op),
+                OpType::COMP(_) => self.execute_comparator(op),
                 OpType::CONJ(conjunction) => {
                     self.state = State::Conjunctive {
                         last_assertion: true,
@@ -405,13 +423,14 @@ impl<'a> Interpreter<'a> {
                 }
             },
             State::AssertionFalse => {
-                // There is no continuation of the last assertion.
-                // This is now considered a failed clause, and hence the contract has failed
                 match op.op_type {
+                    // There is no continuation of the last assertion.
+                    // This is now considered a failed clause, and hence the contract has failed
                     OpType::COMP(_) => {
                         self.state = State::Failed;
                         Ok(())
                     }
+                    // The conjunction will determine whether the contract has failed or succeeded
                     OpType::CONJ(conjunction) => {
                         self.state = State::Conjunctive {
                             last_assertion: false,
@@ -427,9 +446,9 @@ impl<'a> Interpreter<'a> {
                 conjunction: _,
                 invert: _,
             } => {
-                // A Conjunction should be followed by a comparator
+                // A Conjunction must be followed by a comparator
                 match op.op_type {
-                    OpType::COMP(_) => self.evaluate_comparator(op),
+                    OpType::COMP(_) => self.execute_comparator(op),
                     OpType::CONJ(_) => {
                         return Err(InterpErr::UnexpectedOpCode(op.into()));
                     }

@@ -33,6 +33,7 @@ pub enum CompileErr {
     /// A parameter with the same identifier has already been declared
     Redeclared,
     InvalidListElement,
+    /// Comparing user data table entries is not valid
     InvalidCompare,
 }
 
@@ -126,7 +127,7 @@ impl<'a> Compiler<'a> {
         let (comparator_op, invert) = compile_comparator(&assertion.1, &assertion.2)?;
         let rhs_load = self.compile_subject(&assertion.3)?;
 
-        // Step 1 - Determine load order
+        // Determine the Load Order
         let (load, flip) = match lhs_load.1 {
             LoadSource::Input => match rhs_load.1 {
                 LoadSource::Input => (OpLoad::INPUT_VS_INPUT, false),
@@ -138,12 +139,15 @@ impl<'a> Compiler<'a> {
             },
         };
 
+        // Check whether we need to flip the load indices
+        // to meet the load order
         let indices: [u8; 2] = if flip {
             [rhs_load.0, lhs_load.0]
         } else {
             [lhs_load.0, rhs_load.0]
         };
 
+        // A flip means we need to redefine inequalities
         let (comparator_op, invert) = if flip {
             match comparator_op {
                 OpComp::EQ => (comparator_op, invert),
@@ -169,6 +173,7 @@ impl<'a> Compiler<'a> {
             (comparator_op, invert)
         };
 
+        // Form the comparator opcode structure and push it out
         let op = OpCode {
             op_type: OpType::COMP(Comparator {
                 load: load,
@@ -177,11 +182,11 @@ impl<'a> Compiler<'a> {
             }),
             invert: invert,
         };
-
         self.bytecode.push(op.into());
         self.bytecode.push(indices[0]);
         self.bytecode.push(indices[1]);
 
+        // Handle conjunction if it exists
         if let Some((conjunctive, conjoined_assertion)) = &assertion.4 {
             self.bytecode
                 .push(compile_conjunctive(&conjunctive)?.into());
@@ -243,6 +248,8 @@ fn compile_comparator(
     imperative: &ast::Imperative,
     comparator: &ast::Comparator,
 ) -> Result<(OpComp, OpInvert), CompileErr> {
+    // Because of inequalities, the comparator and inversion
+    // operations are tightly coupled.
     let invert: OpInvert = match imperative {
         ast::Imperative::MustBe => OpInvert::NORMAL,
         ast::Imperative::MustNotBe => OpInvert::NOT,
