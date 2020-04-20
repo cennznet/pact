@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/rust:1.38.0
+      - image: circleci/rust:1.42.0
     steps:
       - checkout
       - run:
@@ -34,8 +34,23 @@ jobs:
           command: |
             cargo +nightly --version --verbose
             cargo +nightly check --no-default-features
+  fuzz:
+    docker:
+      - image: circleci/rust:1.42.0
+    steps:
+      - checkout
+      - run:
+          name: setup
+          command: |
+            rustup install nightly
+            cargo +nightly install --force cargo-fuzz
+      - run:
+          name: "Call the fuzz"
+          command: |
+            cargo +nightly fuzz run contract_v0_fuzz -- -runs=100000
 workflows:
   version: 2
   run-build:
     jobs:
       - build
+      - fuzz
