@@ -123,7 +123,7 @@ fn build_assertion(pair: pest::iterators::Pair<Rule>) -> ast::Assertion {
         imperative: imperative,
         comparator: comparator,
         rhs_subject: rhs,
-        conjoined_assertion: conjoined_assertion
+        conjoined_assertion: conjoined_assertion,
     }
 }
 

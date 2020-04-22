@@ -148,7 +148,8 @@ impl<'a> Compiler<'a> {
     /// Compile an assertion AST node
     fn compile_assertion(&mut self, assertion: &'a ast::Assertion) -> Result<(), CompileErr> {
         let lhs_load = self.compile_subject(&assertion.lhs_subject)?;
-        let (comparator_op, invert) = compile_comparator(&assertion.imperative, &assertion.comparator)?;
+        let (comparator_op, invert) =
+            compile_comparator(&assertion.imperative, &assertion.comparator)?;
         let rhs_load = self.compile_subject(&assertion.rhs_subject)?;
 
         // Determine the Load Order
@@ -226,10 +227,7 @@ impl<'a> Compiler<'a> {
     }
 
     /// Compile a subject AST node
-    fn compile_subject(
-        &mut self,
-        subject: &'a ast::Subject,
-    ) -> Result<SubjectSource, CompileErr> {
+    fn compile_subject(&mut self, subject: &'a ast::Subject) -> Result<SubjectSource, CompileErr> {
         // `subject` could be a literal value or an identifier
         // A literal value should be stored in the user data table
         // An identifier should have been declared or it is an error
@@ -242,7 +240,7 @@ impl<'a> Compiler<'a> {
                     ast::Value::List(_) => panic!("Invalid subject"),
                 };
                 self.push_to_datatable(v)?;
-                Ok( SubjectSource {
+                Ok(SubjectSource {
                     load_source: LoadSource::DataTable,
                     index: (self.data_table.len() as u8) - 1,
                 })
@@ -250,13 +248,13 @@ impl<'a> Compiler<'a> {
             ast::Subject::Identifier(ident) => {
                 // Try lookup this var `ident` in the known input and user data tables
                 if let Some(index) = self.input_var_index.get(ident) {
-                    return Ok( SubjectSource {
+                    return Ok(SubjectSource {
                         load_source: LoadSource::Input,
                         index: *index,
                     });
                 }
                 if let Some(index) = self.user_var_index.get(ident) {
-                    return Ok( SubjectSource {
+                    return Ok(SubjectSource {
                         load_source: LoadSource::DataTable,
                         index: *index,
                     });
