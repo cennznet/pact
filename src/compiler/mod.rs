@@ -137,10 +137,10 @@ impl<'a> Compiler<'a> {
     }
 
     fn push_to_datatable(&mut self, value: PactType<'a>) -> Result<(), CompileErr> {
-        self.data_table.push(value);
-        if self.data_table.len() > MAX_ENTRIES {
+        if self.data_table.len() >= MAX_ENTRIES {
             Err(CompileErr::DataTableFull)
         } else {
+            self.data_table.push(value);
             Ok(())
         }
     }
