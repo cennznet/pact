@@ -36,13 +36,13 @@ pub enum Node {
 /// A primitive construct which describes a single invariant
 /// (identifier, imperative, comparator, subject)
 #[derive(Debug)]
-pub struct Assertion(
-    pub Subject,
-    pub Imperative,
-    pub Comparator,
-    pub Subject,
-    pub Option<(Conjunctive, Box<Self>)>,
-);
+pub struct Assertion {
+    pub lhs_subject: Subject,
+    pub imperative: Imperative,
+    pub comparator: Comparator,
+    pub rhs_subject: Subject,
+    pub conjoined_assertion: Option<(Conjunctive, Box<Self>)>,
+}
 
 /// `MustBe` implies `Comparator == true` while `MustNotBe` implies `Comparator == false`
 #[derive(Debug)]

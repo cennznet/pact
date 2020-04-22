@@ -119,6 +119,12 @@ struct Compiler<'a> {
     user_var_index: HashMap<String, u8>,
 }
 
+/// A source for a subject for comparison
+struct SubjectSource {
+    load_source: LoadSource,
+    index: u8,
+}
+
 impl<'a> Compiler<'a> {
     /// Create a new Compiler
     fn new() -> Self {
@@ -141,17 +147,17 @@ impl<'a> Compiler<'a> {
 
     /// Compile an assertion AST node
     fn compile_assertion(&mut self, assertion: &'a ast::Assertion) -> Result<(), CompileErr> {
-        let lhs_load = self.compile_subject(&assertion.0)?;
-        let (comparator_op, invert) = compile_comparator(&assertion.1, &assertion.2)?;
-        let rhs_load = self.compile_subject(&assertion.3)?;
+        let lhs_load = self.compile_subject(&assertion.lhs_subject)?;
+        let (comparator_op, invert) = compile_comparator(&assertion.imperative, &assertion.comparator)?;
+        let rhs_load = self.compile_subject(&assertion.rhs_subject)?;
 
         // Determine the Load Order
-        let (load, flip) = match lhs_load.1 {
-            LoadSource::Input => match rhs_load.1 {
+        let (load, flip) = match lhs_load.load_source {
+            LoadSource::Input => match rhs_load.load_source {
                 LoadSource::Input => (OpLoad::INPUT_VS_INPUT, false),
                 LoadSource::DataTable => (OpLoad::INPUT_VS_USER, false),
             },
-            LoadSource::DataTable => match rhs_load.1 {
+            LoadSource::DataTable => match rhs_load.load_source {
                 LoadSource::Input => (OpLoad::INPUT_VS_USER, true),
                 _ => return Err(CompileErr::InvalidCompare),
             },
@@ -161,13 +167,13 @@ impl<'a> Compiler<'a> {
         // to meet the load order
         let indices = if flip {
             OpIndices {
-                lhs: rhs_load.0,
-                rhs: lhs_load.0,
+                lhs: rhs_load.index,
+                rhs: lhs_load.index,
             }
         } else {
             OpIndices {
-                lhs: lhs_load.0,
-                rhs: rhs_load.0,
+                lhs: lhs_load.index,
+                rhs: rhs_load.index,
             }
         };
 
@@ -210,7 +216,7 @@ impl<'a> Compiler<'a> {
         self.bytecode.push(indices.into());
 
         // Handle conjunction if it exists
-        if let Some((conjunctive, conjoined_assertion)) = &assertion.4 {
+        if let Some((conjunctive, conjoined_assertion)) = &assertion.conjoined_assertion {
             self.bytecode
                 .push(compile_conjunctive(&conjunctive)?.into());
             self.compile_assertion(&*conjoined_assertion)?;
@@ -223,7 +229,7 @@ impl<'a> Compiler<'a> {
     fn compile_subject(
         &mut self,
         subject: &'a ast::Subject,
-    ) -> Result<(u8, LoadSource), CompileErr> {
+    ) -> Result<SubjectSource, CompileErr> {
         // `subject` could be a literal value or an identifier
         // A literal value should be stored in the user data table
         // An identifier should have been declared or it is an error
@@ -236,15 +242,24 @@ impl<'a> Compiler<'a> {
                     ast::Value::List(_) => panic!("Invalid subject"),
                 };
                 self.push_to_datatable(v)?;
-                Ok(((self.data_table.len() as u8) - 1, LoadSource::DataTable))
+                Ok( SubjectSource {
+                    load_source: LoadSource::DataTable,
+                    index: (self.data_table.len() as u8) - 1,
+                })
             }
             ast::Subject::Identifier(ident) => {
                 // Try lookup this var `ident` in the known input and user data tables
                 if let Some(index) = self.input_var_index.get(ident) {
-                    return Ok((*index, LoadSource::Input));
+                    return Ok( SubjectSource {
+                        load_source: LoadSource::Input,
+                        index: *index,
+                    });
                 }
                 if let Some(index) = self.user_var_index.get(ident) {
-                    return Ok((*index, LoadSource::DataTable));
+                    return Ok( SubjectSource {
+                        load_source: LoadSource::DataTable,
+                        index: *index,
+                    });
                 }
                 Err(CompileErr::UndeclaredVar(ident.to_string()))
             }
