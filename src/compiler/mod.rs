@@ -197,3 +197,22 @@ fn compile_comparator(comparator: &ast::Comparator) -> Result<OpCode, CompileErr
         ast::Comparator::OneOf => OpCode::IN,
     })
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::types::BinaryFormatErr;
+
+    #[test]
+    fn contract_binary_format_unsupported_version() {
+        assert_eq!(
+            Contract::decode(&[1, 0]),
+            Err(BinaryFormatErr::UnsupportedVersion)
+        );
+    }
+
+    #[test]
+    fn contract_binary_format_too_short() {
+        assert_eq!(Contract::decode(&[0]), Err(BinaryFormatErr::TooShort));
+    }
+}
