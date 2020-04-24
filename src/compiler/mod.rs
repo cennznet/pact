@@ -153,15 +153,13 @@ impl<'a> Compiler<'a> {
         let rhs_load = self.compile_subject(&assertion.rhs_subject)?;
 
         // Determine the Load Order
-        let (load, flip) = match lhs_load.load_source {
-            LoadSource::Input => match rhs_load.load_source {
-                LoadSource::Input => (OpLoad::INPUT_VS_INPUT, false),
-                LoadSource::DataTable => (OpLoad::INPUT_VS_USER, false),
-            },
-            LoadSource::DataTable => match rhs_load.load_source {
-                LoadSource::Input => (OpLoad::INPUT_VS_USER, true),
-                _ => return Err(CompileErr::InvalidCompare),
-            },
+        let (load, flip) = match (lhs_load.load_source, rhs_load.load_source) {
+            (LoadSource::Input, LoadSource::Input) => (OpLoad::INPUT_VS_INPUT, false),
+            (LoadSource::Input, LoadSource::DataTable) => (OpLoad::INPUT_VS_USER, false),
+            (LoadSource::DataTable, LoadSource::Input) => (OpLoad::INPUT_VS_USER, true),
+            (LoadSource::DataTable, LoadSource::DataTable) => {
+                return Err(CompileErr::InvalidCompare)
+            }
         };
 
         // Check whether we need to flip the load indices
