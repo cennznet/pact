@@ -19,7 +19,7 @@
 #![cfg(test)]
 use pact::{
     interpreter::{self, InterpErr},
-    interpreter::{Comparator, OpCode, OpComp, OpConj, OpIndices, OpInvert, OpLoad, OpType},
+    interpreter::{Comparator, Conjunction, OpCode, OpComp, OpConj, OpIndices, OpInvert, OpLoad},
     types::{Numeric, PactType, StringLike},
 };
 
@@ -36,14 +36,12 @@ macro_rules! comparator {
         comparator!(OpComp::$comp, OpLoad::$load, OpInvert::NORMAL)
     };
     (OpComp::$comp:ident, OpLoad::$load:ident, OpInvert::$invert:ident) => {
-        OpCode {
-            op_type: OpType::COMP(Comparator {
-                load: OpLoad::$load,
-                op: OpComp::$comp,
-                indices: OpIndices { lhs: 0, rhs: 0 },
-            }),
+        OpCode::COMP(Comparator {
+            load: OpLoad::$load,
+            op: OpComp::$comp,
+            indices: OpIndices { lhs: 0, rhs: 0 },
             invert: OpInvert::$invert,
-        }
+        })
     };
 }
 
@@ -53,10 +51,10 @@ macro_rules! conjunction {
         conjunction!(OpConj::$conj, OpInvert::NORMAL)
     };
     (OpConj::$conj:ident, OpInvert::$invert:ident) => {
-        OpCode {
-            op_type: OpType::CONJ(OpConj::$conj),
+        OpCode::CONJ(Conjunction {
+            op: OpConj::$conj,
             invert: OpInvert::$invert,
-        }
+        })
     };
 }
 

@@ -17,7 +17,7 @@
 //! Codec integration tests
 
 #![cfg(test)]
-use pact::interpreter::{Comparator, OpCode, OpComp, OpIndices, OpInvert, OpLoad, OpType};
+use pact::interpreter::{Comparator, OpCode, OpComp, OpIndices, OpInvert, OpLoad};
 use pact::types::{BinaryFormatErr, Contract, DataTable, Numeric, PactType, StringLike};
 
 #[test]
@@ -30,23 +30,19 @@ fn contract_binary_format_codec() {
         ]),
         bytecode: [
             // EQ LD_INPUT(0) LD_USER(0)
-            (OpCode {
-                op_type: OpType::COMP(Comparator {
-                    load: OpLoad::INPUT_VS_USER,
-                    op: OpComp::EQ,
-                    indices: OpIndices { lhs: 1, rhs: 0 },
-                }),
+            OpCode::COMP(Comparator {
+                load: OpLoad::INPUT_VS_USER,
+                op: OpComp::EQ,
+                indices: OpIndices { lhs: 1, rhs: 0 },
                 invert: OpInvert::NORMAL,
             })
             .into(),
             0x10,
             // EQ LD_INPUT(1) LD_USER(1)
-            (OpCode {
-                op_type: OpType::COMP(Comparator {
-                    load: OpLoad::INPUT_VS_USER,
-                    op: OpComp::EQ,
-                    indices: OpIndices { lhs: 1, rhs: 1 },
-                }),
+            OpCode::COMP(Comparator {
+                load: OpLoad::INPUT_VS_USER,
+                op: OpComp::EQ,
+                indices: OpIndices { lhs: 1, rhs: 1 },
                 invert: OpInvert::NORMAL,
             })
             .into(),

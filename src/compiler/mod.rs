@@ -14,7 +14,9 @@
 //   <https://centrality.ai/licenses/gplv3.txt>
 //   <https://centrality.ai/licenses/lgplv3.txt>
 
-use crate::interpreter::{Comparator, OpCode, OpComp, OpConj, OpIndices, OpInvert, OpLoad, OpType};
+use crate::interpreter::{
+    Comparator, Conjunction, OpCode, OpComp, OpConj, OpIndices, OpInvert, OpLoad,
+};
 use crate::parser::ast;
 use crate::types::{Contract, DataTable, Numeric, PactType, StringLike};
 
@@ -163,21 +165,24 @@ impl<'a> Compiler<'a> {
         };
 
         // Form the comparator opcode structure and push it out
-        let op = OpCode {
-            op_type: OpType::COMP(Comparator {
-                load: load,
-                op: comparator_op,
-                indices: OpIndices {
-                    lhs: lhs_load.index,
-                    rhs: rhs_load.index,
-                },
-            }),
+        let comparator = Comparator {
+            load: load,
+            op: comparator_op,
+            indices: OpIndices {
+                lhs: lhs_load.index,
+                rhs: rhs_load.index,
+            },
             invert: invert,
         };
 
-        let op = if flip { op.flip_indices() } else { op };
+        let comparator = if flip {
+            comparator.flip_indices()
+        } else {
+            comparator
+        };
+        let op = OpCode::COMP(comparator);
         self.bytecode.push(op.into());
-        self.bytecode.push(op.get_indices().into());
+        self.bytecode.push(comparator.indices.into());
 
         // Handle conjunction if it exists
         if let Some((conjunctive, conjoined_assertion)) = &assertion.conjoined_assertion {
@@ -231,14 +236,14 @@ impl<'a> Compiler<'a> {
 /// Compile a conjunction AST node
 fn compile_conjunctive(conjunctive: &ast::Conjunctive) -> Result<OpCode, CompileErr> {
     Ok(match conjunctive {
-        ast::Conjunctive::And => OpCode {
-            op_type: OpType::CONJ(OpConj::AND),
+        ast::Conjunctive::And => OpCode::CONJ(Conjunction {
+            op: OpConj::AND,
             invert: OpInvert::NORMAL,
-        },
-        ast::Conjunctive::Or => OpCode {
-            op_type: OpType::CONJ(OpConj::OR),
+        }),
+        ast::Conjunctive::Or => OpCode::CONJ(Conjunction {
+            op: OpConj::OR,
             invert: OpInvert::NORMAL,
-        },
+        }),
     })
 }
 
