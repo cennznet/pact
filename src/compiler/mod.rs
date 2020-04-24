@@ -161,15 +161,16 @@ impl<'a> Compiler<'a> {
         }
 
         // Build and compile comparator
-        let _ = OpCode::COMP(Comparator::from(&assertion.comparator)
-            .apply_imperative(&assertion.imperative)
-            .loads_from_subjects(lhs_load, rhs_load))
-            .compile(&mut self.bytecode)?;
+        let _ = OpCode::COMP(
+            Comparator::from(&assertion.comparator)
+                .apply_imperative(&assertion.imperative)
+                .loads_from_subjects(lhs_load, rhs_load),
+        )
+        .compile(&mut self.bytecode)?;
 
         // Handle conjunction if it exists
         if let Some((conjunctive, conjoined_assertion)) = &assertion.conjoined_assertion {
-            let _ = OpCode::CONJ(Conjunction::from(conjunctive))
-                .compile(&mut self.bytecode)?;
+            let _ = OpCode::CONJ(Conjunction::from(conjunctive)).compile(&mut self.bytecode)?;
             self.compile_assertion(&*conjoined_assertion)?;
         }
 

@@ -19,44 +19,9 @@
 #![cfg(test)]
 use pact::{
     interpreter::{self, InterpErr},
-    interpreter::{Comparator, Conjunction, OpCode, OpComp, OpConj, OpIndices, OpInvert, OpLoad},
+    interpreter::{Comparator, Conjunction, OpCode, OpComp, OpConj, OpInvert, OpLoad},
     types::{Numeric, PactType, StringLike},
 };
-
-// Helper Macros
-// Create a comparator op code
-macro_rules! comparator {
-    (OpComp::$comp:ident) => {
-        comparator!(OpComp::$comp, OpLoad::INPUT_VS_USER, OpInvert::NORMAL)
-    };
-    (OpComp::$comp:ident, OpInvert::$invert:ident) => {
-        comparator!(OpComp::$comp, OpLoad::INPUT_VS_USER, OpInvert::$invert)
-    };
-    (OpComp::$comp:ident, OpLoad::$load:ident) => {
-        comparator!(OpComp::$comp, OpLoad::$load, OpInvert::NORMAL)
-    };
-    (OpComp::$comp:ident, OpLoad::$load:ident, OpInvert::$invert:ident) => {
-        OpCode::COMP(Comparator {
-            load: OpLoad::$load,
-            op: OpComp::$comp,
-            indices: OpIndices { lhs: 0, rhs: 0 },
-            invert: OpInvert::$invert,
-        })
-    };
-}
-
-// Create a conjunction op code
-macro_rules! conjunction {
-    (OpConj::$conj:ident) => {
-        conjunction!(OpConj::$conj, OpInvert::NORMAL)
-    };
-    (OpConj::$conj:ident, OpInvert::$invert:ident) => {
-        OpCode::CONJ(Conjunction {
-            op: OpConj::$conj,
-            invert: OpInvert::$invert,
-        })
-    };
-}
 
 #[test]
 fn it_does_an_eq_comparison() {
@@ -70,10 +35,10 @@ fn it_does_an_eq_comparison() {
             PactType::StringLike(StringLike(b"hello world")),
         ],
         &[
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x00,
             // INPUT(1) == USER(1)
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x11,
         ],
     );
@@ -88,7 +53,7 @@ fn it_does_a_not_eq_comparison() {
         PactType::Numeric(Numeric(234)),
     ];
     let user = [PactType::Numeric(Numeric(123))];
-    let neq = comparator!(OpComp::EQ, OpInvert::NOT);
+    let neq = OpCode::COMP(Comparator::new(OpComp::EQ).invert(OpInvert::NOT));
 
     let result = interpreter::interpret(&input, &user, &[neq.into(), 0x00]);
     assert_eq!(result, Ok(false));
@@ -104,7 +69,7 @@ fn it_does_a_lt_comparison_ok() {
         &[PactType::Numeric(Numeric(100))],
         &[
             // INPUT(1) < USER(1)
-            comparator!(OpComp::GTE, OpInvert::NOT).into(),
+            OpCode::COMP(Comparator::new(OpComp::GTE).invert(OpInvert::NOT)).into(),
             0x00,
         ],
     );
@@ -119,7 +84,7 @@ fn it_does_an_lte_comparison_ok() {
         &[PactType::Numeric(Numeric(100))],
         &[
             // INPUT(1) <= USER(1)
-            comparator!(OpComp::GT, OpInvert::NOT).into(),
+            OpCode::COMP(Comparator::new(OpComp::GT).invert(OpInvert::NOT)).into(),
             0x00,
         ],
     );
@@ -134,7 +99,7 @@ fn it_does_a_gt_comparison_ok() {
         &[PactType::Numeric(Numeric(100))],
         &[
             // INPUT(1) > USER(1)
-            comparator!(OpComp::GT).into(),
+            OpCode::COMP(Comparator::new(OpComp::GT)).into(),
             0x00,
         ],
     );
@@ -149,7 +114,7 @@ fn it_does_a_gte_comparison_ok() {
         &[PactType::Numeric(Numeric(100))],
         &[
             // INPUT(1) < USER(1)
-            comparator!(OpComp::GTE).into(),
+            OpCode::COMP(Comparator::new(OpComp::GTE)).into(),
             0x00,
         ],
     );
@@ -159,7 +124,7 @@ fn it_does_a_gte_comparison_ok() {
 
 #[test]
 fn input_to_input_works() {
-    let eq = comparator!(OpComp::EQ, OpLoad::INPUT_VS_INPUT);
+    let eq = OpCode::COMP(Comparator::new(OpComp::EQ).load(OpLoad::INPUT_VS_INPUT));
     let result = interpreter::interpret(
         &[
             PactType::Numeric(Numeric(123)),
@@ -174,11 +139,11 @@ fn input_to_input_works() {
 #[test]
 fn it_fails_with_bad_type_operation_on_stringlike() {
     let bad_op_codes = vec![
-        comparator!(OpComp::GTE).into(),
-        comparator!(OpComp::GT).into(),
-        comparator!(OpComp::GTE, OpInvert::NOT).into(),
-        comparator!(OpComp::GT, OpInvert::NOT).into(),
-        comparator!(OpComp::IN).into(),
+        OpCode::COMP(Comparator::new(OpComp::GTE)).into(),
+        OpCode::COMP(Comparator::new(OpComp::GT)).into(),
+        OpCode::COMP(Comparator::new(OpComp::GTE).invert(OpInvert::NOT)).into(),
+        OpCode::COMP(Comparator::new(OpComp::GT).invert(OpInvert::NOT)).into(),
+        OpCode::COMP(Comparator::new(OpComp::IN)).into(),
     ];
     for op in bad_op_codes.into_iter() {
         let result = interpreter::interpret(
@@ -199,25 +164,37 @@ fn it_fails_with_invalid_op_code() {
 
 #[test]
 fn load_input_fails_with_unexpected_end_of_input() {
-    let result = interpreter::interpret(&[], &[], &[comparator!(OpComp::GTE).into()]);
+    let result = interpreter::interpret(
+        &[],
+        &[],
+        &[OpCode::COMP(Comparator::new(OpComp::GTE)).into()],
+    );
     assert_eq!(result, Err(InterpErr::UnexpectedEOI("expected index")));
 }
 
 #[test]
 fn it_fails_when_comparator_is_not_followed_by_load_indexes() {
-    let result = interpreter::interpret(&[], &[], &[comparator!(OpComp::EQ).into()]);
+    let result = interpreter::interpret(
+        &[],
+        &[],
+        &[OpCode::COMP(Comparator::new(OpComp::EQ)).into()],
+    );
     assert_eq!(result, Err(InterpErr::UnexpectedEOI("expected index")));
 }
 
 #[test]
 fn load_fails_with_missing_index() {
-    let result = interpreter::interpret(&[], &[], &[comparator!(OpComp::EQ).into(), 0x05]);
+    let result = interpreter::interpret(
+        &[],
+        &[],
+        &[OpCode::COMP(Comparator::new(OpComp::EQ)).into(), 0x05],
+    );
     assert_eq!(result, Err(InterpErr::MissingIndex(0)));
 
     let result = interpreter::interpret(
         &[PactType::Numeric(Numeric(101))],
         &[PactType::Numeric(Numeric(101))],
-        &[comparator!(OpComp::EQ).into(), 0x05],
+        &[OpCode::COMP(Comparator::new(OpComp::EQ)).into(), 0x05],
     );
     assert_eq!(result, Err(InterpErr::MissingIndex(5)));
 }
@@ -230,18 +207,25 @@ fn load_input_to_input_fails_with_missing_index_2() {
             PactType::Numeric(Numeric(123)),
             PactType::Numeric(Numeric(123)),
         ],
-        &[comparator!(OpComp::EQ, OpLoad::INPUT_VS_INPUT).into(), 0x01],
+        &[
+            OpCode::COMP(Comparator::new(OpComp::EQ).load(OpLoad::INPUT_VS_INPUT)).into(),
+            0x01,
+        ],
     );
     assert_eq!(result, Err(InterpErr::MissingIndex(1)));
 }
 
 #[test]
 fn it_fails_when_first_op_code_is_not_a_comparator() {
-    let result = interpreter::interpret(&[], &[], &[conjunction!(OpConj::AND).into()]);
+    let result = interpreter::interpret(
+        &[],
+        &[],
+        &[OpCode::CONJ(Conjunction::new(OpConj::AND)).into()],
+    );
     assert_eq!(
         result,
         Err(InterpErr::UnexpectedOpCode(
-            conjunction!(OpConj::AND).into()
+            OpCode::CONJ(Conjunction::new(OpConj::AND)).into()
         ))
     );
 }
@@ -258,10 +242,10 @@ fn it_does_an_and_conjunction_ok() {
             PactType::StringLike(StringLike(b"hello world")),
         ],
         &[
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x00,
-            conjunction!(OpConj::AND).into(),
-            comparator!(OpComp::EQ).into(),
+            OpCode::CONJ(Conjunction::new(OpConj::AND)).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x11,
         ],
     );
@@ -280,10 +264,10 @@ fn it_does_an_or_conjunction_ok() {
             PactType::StringLike(StringLike(b"hello world")),
         ],
         &[
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x00,
-            conjunction!(OpConj::OR).into(),
-            comparator!(OpComp::EQ).into(),
+            OpCode::CONJ(Conjunction::new(OpConj::OR)).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x11,
         ],
     );
@@ -299,10 +283,10 @@ fn it_does_an_or_conjunction_ok() {
             PactType::StringLike(StringLike(b"hello world")),
         ],
         &[
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x00,
-            conjunction!(OpConj::OR).into(),
-            comparator!(OpComp::EQ).into(),
+            OpCode::CONJ(Conjunction::new(OpConj::OR)).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x11,
         ],
     );
@@ -321,10 +305,10 @@ fn it_does_a_xor_conjunction_ok() {
             PactType::StringLike(StringLike(b"hello world")),
         ],
         &[
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x00,
-            conjunction!(OpConj::XOR).into(),
-            comparator!(OpComp::EQ).into(),
+            OpCode::CONJ(Conjunction::new(OpConj::XOR)).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x11,
         ],
     );
@@ -343,10 +327,10 @@ fn it_does_an_and_conjunction_evaluates_false() {
             PactType::StringLike(StringLike(b"hello world")),
         ],
         &[
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x00,
-            conjunction!(OpConj::AND).into(),
-            comparator!(OpComp::EQ).into(),
+            OpCode::CONJ(Conjunction::new(OpConj::AND)).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x11,
         ],
     );
@@ -365,10 +349,10 @@ fn it_does_an_or_conjunction_evaluates_false() {
             PactType::StringLike(StringLike(b"world hello")),
         ],
         &[
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x00,
-            conjunction!(OpConj::OR).into(),
-            comparator!(OpComp::EQ).into(),
+            OpCode::CONJ(Conjunction::new(OpConj::OR)).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x11,
         ],
     );
@@ -387,10 +371,10 @@ fn it_does_a_xor_conjunction_evaluates_false() {
             PactType::StringLike(StringLike(b"hello world")),
         ],
         &[
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x00,
-            conjunction!(OpConj::XOR).into(),
-            comparator!(OpComp::EQ).into(),
+            OpCode::CONJ(Conjunction::new(OpConj::XOR)).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x11,
         ],
     );
@@ -403,9 +387,9 @@ fn it_fails_with_unexpected_end_of_input_no_rhs_of_conjunction() {
         &[PactType::Numeric(Numeric(123))],
         &[PactType::Numeric(Numeric(123))],
         &[
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x00,
-            conjunction!(OpConj::AND).into(),
+            OpCode::CONJ(Conjunction::new(OpConj::AND)).into(),
         ],
     );
     assert_eq!(
@@ -427,10 +411,10 @@ fn it_does_an_eq_comparison_evaluates_false() {
         ],
         &[
             // EQ LD_INPUT(0) LD_USER(0)
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x00,
             // EQ LD_INPUT(1) LD_USER(1)
-            comparator!(OpComp::EQ).into(),
+            OpCode::COMP(Comparator::new(OpComp::EQ)).into(),
             0x11,
         ],
     );
@@ -443,7 +427,10 @@ fn it_does_an_lt_comparison_evaluates_false() {
     let result = interpreter::interpret(
         &[PactType::Numeric(Numeric(100))],
         &[PactType::Numeric(Numeric(99))],
-        &[comparator!(OpComp::GTE, OpInvert::NOT).into(), 0x00],
+        &[
+            OpCode::COMP(Comparator::new(OpComp::GTE).invert(OpInvert::NOT)).into(),
+            0x00,
+        ],
     );
 
     assert_eq!(result, Ok(false));
@@ -454,7 +441,10 @@ fn it_does_an_lte_comparison_evaluates_false() {
     let result = interpreter::interpret(
         &[PactType::Numeric(Numeric(101))],
         &[PactType::Numeric(Numeric(100))],
-        &[comparator!(OpComp::GT, OpInvert::NOT).into(), 0x00],
+        &[
+            OpCode::COMP(Comparator::new(OpComp::GT).invert(OpInvert::NOT)).into(),
+            0x00,
+        ],
     );
 
     assert_eq!(result, Ok(false));
@@ -465,7 +455,7 @@ fn it_does_a_gt_comparison_evaluates_false() {
     let result = interpreter::interpret(
         &[PactType::Numeric(Numeric(100))],
         &[PactType::Numeric(Numeric(101))],
-        &[comparator!(OpComp::GT).into(), 0x00],
+        &[OpCode::COMP(Comparator::new(OpComp::GT)).into(), 0x00],
     );
 
     assert_eq!(result, Ok(false));
@@ -476,7 +466,7 @@ fn it_does_a_gte_comparison_evaluates_false() {
     let result = interpreter::interpret(
         &[PactType::Numeric(Numeric(100))],
         &[PactType::Numeric(Numeric(101))],
-        &[comparator!(OpComp::GTE).into(), 0x00],
+        &[OpCode::COMP(Comparator::new(OpComp::GTE)).into(), 0x00],
     );
 
     assert_eq!(result, Ok(false));
@@ -493,14 +483,14 @@ fn it_does_a_numeric_in_comparison() {
     let result = interpreter::interpret(
         &input_data,
         &user_data,
-        &[comparator!(OpComp::IN).into(), 0x00],
+        &[OpCode::COMP(Comparator::new(OpComp::IN)).into(), 0x00],
     );
     assert_eq!(result, Ok(true));
 
     let result = interpreter::interpret(
         &input_data,
         &user_data,
-        &[comparator!(OpComp::IN).into(), 0x10],
+        &[OpCode::COMP(Comparator::new(OpComp::IN)).into(), 0x10],
     );
     assert_eq!(result, Ok(false));
 }
@@ -519,14 +509,14 @@ fn it_does_a_string_in_comparison() {
     let result = interpreter::interpret(
         &input_data,
         &user_data,
-        &[comparator!(OpComp::IN).into(), 0x00],
+        &[OpCode::COMP(Comparator::new(OpComp::IN)).into(), 0x00],
     );
     assert_eq!(result, Ok(true));
 
     let result = interpreter::interpret(
         &input_data,
         &user_data,
-        &[comparator!(OpComp::IN).into(), 0x10],
+        &[OpCode::COMP(Comparator::new(OpComp::IN)).into(), 0x10],
     );
     assert_eq!(result, Ok(false));
 }
@@ -543,7 +533,7 @@ fn it_fails_with_lhs_list_for_in_comparison() {
     let result = interpreter::interpret(
         &input_data,
         &user_data,
-        &[comparator!(OpComp::IN).into(), 0x00],
+        &[OpCode::COMP(Comparator::new(OpComp::IN)).into(), 0x00],
     );
     assert_eq!(result, Err(InterpErr::BadTypeOperation));
 
@@ -551,7 +541,7 @@ fn it_fails_with_lhs_list_for_in_comparison() {
     let result = interpreter::interpret(
         &input_data,
         &input_data,
-        &[comparator!(OpComp::IN).into(), 0x00],
+        &[OpCode::COMP(Comparator::new(OpComp::IN)).into(), 0x00],
     );
     assert_eq!(result, Err(InterpErr::BadTypeOperation));
 }
@@ -567,7 +557,7 @@ fn it_does_an_in_comparison_with_a_mixed_list() {
     let result = interpreter::interpret(
         &input_data,
         &user_data,
-        &[comparator!(OpComp::IN).into(), 0x00],
+        &[OpCode::COMP(Comparator::new(OpComp::IN)).into(), 0x00],
     );
     assert_eq!(result, Ok(true));
 }
@@ -583,14 +573,20 @@ fn it_does_a_not_in_comparison() {
     let result = interpreter::interpret(
         &input_data,
         &user_data,
-        &[comparator!(OpComp::IN, OpInvert::NOT).into(), 0x00],
+        &[
+            OpCode::COMP(Comparator::new(OpComp::IN).invert(OpInvert::NOT)).into(),
+            0x00,
+        ],
     );
     assert_eq!(result, Ok(false));
 
     let result = interpreter::interpret(
         &input_data,
         &user_data,
-        &[comparator!(OpComp::IN, OpInvert::NOT).into(), 0x10],
+        &[
+            OpCode::COMP(Comparator::new(OpComp::IN).invert(OpInvert::NOT)).into(),
+            0x10,
+        ],
     );
     assert_eq!(result, Ok(true));
 }
@@ -604,11 +600,11 @@ fn it_fails_for_invalid_list_operators() {
     ])];
 
     let invalid_code_set = [
-        comparator!(OpComp::EQ),
-        comparator!(OpComp::GT, OpInvert::NOT),
-        comparator!(OpComp::GTE, OpInvert::NOT),
-        comparator!(OpComp::GT),
-        comparator!(OpComp::GTE),
+        OpCode::COMP(Comparator::new(OpComp::EQ)),
+        OpCode::COMP(Comparator::new(OpComp::GT).invert(OpInvert::NOT)),
+        OpCode::COMP(Comparator::new(OpComp::GTE).invert(OpInvert::NOT)),
+        OpCode::COMP(Comparator::new(OpComp::GT)),
+        OpCode::COMP(Comparator::new(OpComp::GTE)),
     ];
 
     for invalid_code in &invalid_code_set {

@@ -1,4 +1,4 @@
-use crate::compiler::{LoadSource, SubjectSource, CompileErr};
+use crate::compiler::{CompileErr, LoadSource, SubjectSource};
 use crate::interpreter::InterpErr;
 use crate::parser::ast;
 use core::convert::From;
