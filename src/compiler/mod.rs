@@ -14,17 +14,22 @@
 //   <https://centrality.ai/licenses/gplv3.txt>
 //   <https://centrality.ai/licenses/lgplv3.txt>
 
-use crate::interpreter::{
-    Comparator, Conjunction, OpCode, OpComp, OpConj, OpIndices, OpInvert, OpLoad,
-};
+use crate::interpreter::{Comparator, Conjunction, OpCode};
 use crate::parser::ast;
 use crate::types::{Contract, DataTable, Numeric, PactType, StringLike};
 
 use hashbrown::HashMap;
 
+#[derive(Clone, Copy)]
 pub enum LoadSource {
     Input,
     DataTable,
+}
+
+/// A source for a subject for comparison
+pub struct SubjectSource {
+    pub load_source: LoadSource,
+    pub index: u8,
 }
 
 const MAX_ENTRIES: usize = 16;
@@ -121,12 +126,6 @@ struct Compiler<'a> {
     user_var_index: HashMap<String, u8>,
 }
 
-/// A source for a subject for comparison
-struct SubjectSource {
-    load_source: LoadSource,
-    index: u8,
-}
-
 impl<'a> Compiler<'a> {
     /// Create a new Compiler
     fn new() -> Self {
@@ -150,37 +149,20 @@ impl<'a> Compiler<'a> {
     /// Compile an assertion AST node
     fn compile_assertion(&mut self, assertion: &'a ast::Assertion) -> Result<(), CompileErr> {
         let lhs_load = self.compile_subject(&assertion.lhs_subject)?;
-        let (comparator_op, invert) =
-            compile_comparator(&assertion.imperative, &assertion.comparator)?;
+        let comparator = compile_comparator(&assertion.imperative, &assertion.comparator)?;
         let rhs_load = self.compile_subject(&assertion.rhs_subject)?;
 
-        // Determine the Load Order
-        let (load, flip) = match (lhs_load.load_source, rhs_load.load_source) {
-            (LoadSource::Input, LoadSource::Input) => (OpLoad::INPUT_VS_INPUT, false),
-            (LoadSource::Input, LoadSource::DataTable) => (OpLoad::INPUT_VS_USER, false),
-            (LoadSource::DataTable, LoadSource::Input) => (OpLoad::INPUT_VS_USER, true),
+        match (lhs_load.load_source.clone(), rhs_load.load_source.clone()) {
             (LoadSource::DataTable, LoadSource::DataTable) => {
                 return Err(CompileErr::InvalidCompare)
             }
-        };
+            (_, _) => {}
+        }
 
-        // Form the comparator opcode structure and push it out
-        let comparator = Comparator {
-            load: load,
-            op: comparator_op,
-            indices: OpIndices {
-                lhs: lhs_load.index,
-                rhs: rhs_load.index,
-            },
-            invert: invert,
-        };
+        let comparator = comparator.loads_from_subjects(lhs_load, rhs_load);
 
-        let comparator = if flip {
-            comparator.flip_indices()
-        } else {
-            comparator
-        };
         let op = OpCode::COMP(comparator);
+
         self.bytecode.push(op.into());
         self.bytecode.push(comparator.indices.into());
 
@@ -235,49 +217,15 @@ impl<'a> Compiler<'a> {
 
 /// Compile a conjunction AST node
 fn compile_conjunctive(conjunctive: &ast::Conjunctive) -> Result<OpCode, CompileErr> {
-    Ok(match conjunctive {
-        ast::Conjunctive::And => OpCode::CONJ(Conjunction {
-            op: OpConj::AND,
-            invert: OpInvert::NORMAL,
-        }),
-        ast::Conjunctive::Or => OpCode::CONJ(Conjunction {
-            op: OpConj::OR,
-            invert: OpInvert::NORMAL,
-        }),
-    })
+    Ok(OpCode::CONJ(Conjunction::from(conjunctive)))
 }
 
 /// Compile a comparator AST node
 fn compile_comparator(
     imperative: &ast::Imperative,
     comparator: &ast::Comparator,
-) -> Result<(OpComp, OpInvert), CompileErr> {
-    // Because of inequalities, the comparator and inversion
-    // operations are tightly coupled.
-    let invert: OpInvert = match imperative {
-        ast::Imperative::MustBe => OpInvert::NORMAL,
-        ast::Imperative::MustNotBe => OpInvert::NOT,
-    };
-    Ok(match comparator {
-        ast::Comparator::Equal => (OpComp::EQ, invert),
-        ast::Comparator::GreaterThan => (OpComp::GT, invert),
-        ast::Comparator::GreaterThanOrEqual => (OpComp::GTE, invert),
-        ast::Comparator::LessThan => {
-            let invert = match invert {
-                OpInvert::NORMAL => OpInvert::NOT,
-                OpInvert::NOT => OpInvert::NORMAL,
-            };
-            (OpComp::GTE, invert)
-        }
-        ast::Comparator::LessThanOrEqual => {
-            let invert = match invert {
-                OpInvert::NORMAL => OpInvert::NOT,
-                OpInvert::NOT => OpInvert::NORMAL,
-            };
-            (OpComp::GT, invert)
-        }
-        ast::Comparator::OneOf => (OpComp::IN, invert),
-    })
+) -> Result<Comparator, CompileErr> {
+    Ok(Comparator::from(comparator).apply_imperative(imperative))
 }
 
 #[cfg(test)]

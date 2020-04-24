@@ -1,4 +1,7 @@
+use crate::compiler::{LoadSource, SubjectSource};
 use crate::interpreter::InterpErr;
+use crate::parser::ast;
+use core::convert::From;
 
 // OpCode masks
 const OP_TYPE_MASK: u8 = 0b0010_0000;
@@ -159,8 +162,52 @@ impl OpCode {
 }
 
 impl Comparator {
-    pub fn flip_indices(self) -> Self {
-        let indices = OpIndices {
+    pub fn new(op: OpComp) -> Self {
+        Comparator {
+            load: OpLoad::INPUT_VS_USER,
+            op: op,
+            indices: OpIndices { lhs: 0, rhs: 0 },
+            invert: OpInvert::NORMAL,
+        }
+    }
+
+    pub fn load(mut self, load: OpLoad) -> Self {
+        self.load = load;
+        self
+    }
+
+    pub fn indices(mut self, lhs: u8, rhs: u8) -> Self {
+        self.indices.lhs = lhs;
+        self.indices.rhs = rhs;
+        self
+    }
+
+    pub fn invert(mut self, invert: OpInvert) -> Self {
+        self.invert = invert;
+        self
+    }
+
+    pub fn loads_from_subjects(mut self, lhs: SubjectSource, rhs: SubjectSource) -> Self {
+        // Determine the Load Order
+        let (load, flip) = match (lhs.load_source, rhs.load_source) {
+            (LoadSource::Input, LoadSource::Input) => (OpLoad::INPUT_VS_INPUT, false),
+            (LoadSource::Input, LoadSource::DataTable) => (OpLoad::INPUT_VS_USER, false),
+            (LoadSource::DataTable, LoadSource::Input) => (OpLoad::INPUT_VS_USER, true),
+            (_, _) => (OpLoad::INPUT_VS_USER, true), // Should not reach here
+        };
+
+        // Form the comparator opcode structure and push it out
+        self = self.load(load).indices(lhs.index, rhs.index);
+
+        if flip {
+            self.flip_indices()
+        } else {
+            self
+        }
+    }
+
+    pub fn flip_indices(mut self) -> Self {
+        self.indices = OpIndices {
             lhs: self.indices.rhs,
             rhs: self.indices.lhs,
         };
@@ -170,21 +217,63 @@ impl Comparator {
             OpComp::GT => (OpComp::GTE, self.invert.invert()),
             OpComp::GTE => (OpComp::GT, self.invert.invert()),
         };
-        Comparator {
-            load: self.load,
+        self.op = op;
+        self.invert = invert;
+        self
+    }
+
+    pub fn apply_imperative(mut self, imperative: &ast::Imperative) -> Self {
+        match imperative {
+            ast::Imperative::MustBe => {}
+            ast::Imperative::MustNotBe => self.invert = self.invert.invert(),
+        };
+        self
+    }
+}
+
+impl From<&ast::Comparator> for Comparator {
+    fn from(comparator: &ast::Comparator) -> Self {
+        match comparator {
+            ast::Comparator::Equal => Comparator::new(OpComp::EQ),
+            ast::Comparator::GreaterThan => Comparator::new(OpComp::GT),
+            ast::Comparator::GreaterThanOrEqual => Comparator::new(OpComp::GTE),
+            ast::Comparator::LessThan => Comparator::new(OpComp::GTE).invert(OpInvert::NOT),
+            ast::Comparator::LessThanOrEqual => Comparator::new(OpComp::GT).invert(OpInvert::NOT),
+            ast::Comparator::OneOf => Comparator::new(OpComp::IN),
+        }
+    }
+}
+
+impl Conjunction {
+    pub fn new(op: OpConj) -> Self {
+        Conjunction {
             op: op,
-            indices: indices,
-            invert: invert,
+            invert: OpInvert::NORMAL,
+        }
+    }
+
+    pub fn invert(mut self, invert: OpInvert) -> Self {
+        self.invert = invert;
+        self
+    }
+}
+
+impl From<&ast::Conjunctive> for Conjunction {
+    fn from(conjunctive: &ast::Conjunctive) -> Self {
+        match conjunctive {
+            ast::Conjunctive::And => Conjunction::new(OpConj::AND),
+            ast::Conjunctive::Or => Conjunction::new(OpConj::OR),
         }
     }
 }
 
 impl OpInvert {
-    fn invert(self) -> Self {
-        match self {
+    pub fn invert(mut self) -> Self {
+        self = match self {
             OpInvert::NORMAL => OpInvert::NOT,
             OpInvert::NOT => OpInvert::NORMAL,
-        }
+        };
+        self
     }
 }
 
