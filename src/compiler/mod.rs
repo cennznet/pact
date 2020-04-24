@@ -14,25 +14,11 @@
 //   <https://centrality.ai/licenses/gplv3.txt>
 //   <https://centrality.ai/licenses/lgplv3.txt>
 
-use crate::interpreter::{Comparator, Conjunction, OpCode};
 use crate::parser::ast;
+use crate::types::opcode::{Comparator, Conjunction, LoadSource, OpCode, SubjectSource};
 use crate::types::{Contract, DataTable, Numeric, PactType, StringLike};
 
 use hashbrown::HashMap;
-
-/// Indicates whether the source of a load is an `Input`
-/// or stored on the compiled `DataTable`
-#[derive(Clone, Copy)]
-pub enum LoadSource {
-    Input,
-    DataTable,
-}
-
-/// A source for a subject for comparison
-pub struct SubjectSource {
-    pub load_source: LoadSource,
-    pub index: u8,
-}
 
 const MAX_ENTRIES: usize = 16;
 
@@ -166,11 +152,11 @@ impl<'a> Compiler<'a> {
                 .apply_imperative(&assertion.imperative)
                 .loads_from_subjects(lhs_load, rhs_load),
         )
-        .compile(&mut self.bytecode)?;
+        .compile(&mut self.bytecode);
 
         // Handle conjunction if it exists
         if let Some((conjunctive, conjoined_assertion)) = &assertion.conjoined_assertion {
-            let _ = OpCode::CONJ(Conjunction::from(conjunctive)).compile(&mut self.bytecode)?;
+            let _ = OpCode::CONJ(Conjunction::from(conjunctive)).compile(&mut self.bytecode);
             self.compile_assertion(&*conjoined_assertion)?;
         }
 

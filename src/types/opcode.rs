@@ -1,6 +1,10 @@
-use crate::compiler::{CompileErr, LoadSource, SubjectSource};
 use crate::interpreter::InterpErr;
+use alloc::vec::Vec;
+
+#[cfg(feature = "compiler")]
 use crate::parser::ast;
+
+#[cfg(feature = "compiler")]
 use core::convert::From;
 
 // OpCode masks
@@ -15,6 +19,20 @@ const INDEX_RHS_MASK: u8 = 0b0000_1111;
 
 const INDEX_LHS_SHIFT: usize = 4;
 const INDEX_RHS_SHIFT: usize = 0;
+
+/// Indicates whether the source of a load is an `Input`
+/// or stored on the compiled `DataTable`
+#[derive(Clone, Copy)]
+pub enum LoadSource {
+    Input,
+    DataTable,
+}
+
+/// A source for a subject for comparison
+pub struct SubjectSource {
+    pub load_source: LoadSource,
+    pub index: u8,
+}
 
 /// Data structure which breaks down the anatomy of an OpCode
 #[cfg_attr(feature = "std", derive(Debug))]
@@ -93,13 +111,12 @@ pub enum OpConj {
 
 impl OpCode {
     // Compiles the OpCode object into one or more bytes
-    pub fn compile(self, stream: &mut Vec<u8>) -> Result<(), CompileErr> {
+    pub fn compile(self, stream: &mut Vec<u8>) {
         stream.push(self.into());
         match self {
             OpCode::COMP(comparator) => stream.push(comparator.indices.into()),
             _ => {}
         };
-        Ok(())
     }
 
     /// Return the next OpCode by parsing an input byte stream
@@ -243,6 +260,7 @@ impl Comparator {
     }
 
     // Applies an `ast::Imperative` to the `invert` parameter
+    #[cfg(feature = "compiler")]
     pub fn apply_imperative(mut self, imperative: &ast::Imperative) -> Self {
         match imperative {
             ast::Imperative::MustBe => {}
@@ -252,6 +270,7 @@ impl Comparator {
     }
 }
 
+#[cfg(feature = "compiler")]
 impl From<&ast::Comparator> for Comparator {
     // Creates a `Comparator` from an `ast::Comparator` type
     fn from(comparator: &ast::Comparator) -> Self {
@@ -282,8 +301,9 @@ impl Conjunction {
     }
 }
 
-// Creates a `Conjunction` from an `ast::Conjunctive` type
+#[cfg(feature = "compiler")]
 impl From<&ast::Conjunctive> for Conjunction {
+    // Creates a `Conjunction` from an `ast::Conjunctive` type
     fn from(conjunctive: &ast::Conjunctive) -> Self {
         match conjunctive {
             ast::Conjunctive::And => Conjunction::new(OpConj::AND),
@@ -375,33 +395,19 @@ mod test {
     #[test]
     fn compile_comparators_basic() {
         let mut bytes = Vec::<u8>::default();
-        OpCode::COMP(Comparator::new(OpComp::EQ))
-            .compile(&mut bytes)
-            .unwrap();
-        OpCode::COMP(Comparator::new(OpComp::GT))
-            .compile(&mut bytes)
-            .unwrap();
-        OpCode::COMP(Comparator::new(OpComp::GTE))
-            .compile(&mut bytes)
-            .unwrap();
-        OpCode::COMP(Comparator::new(OpComp::IN))
-            .compile(&mut bytes)
-            .unwrap();
+        OpCode::COMP(Comparator::new(OpComp::EQ)).compile(&mut bytes);
+        OpCode::COMP(Comparator::new(OpComp::GT)).compile(&mut bytes);
+        OpCode::COMP(Comparator::new(OpComp::GTE)).compile(&mut bytes);
+        OpCode::COMP(Comparator::new(OpComp::IN)).compile(&mut bytes);
         assert_eq!(bytes, vec![0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00,]);
     }
 
     #[test]
     fn compile_conjunctions_basic() {
         let mut bytes = Vec::<u8>::default();
-        OpCode::CONJ(Conjunction::new(OpConj::AND))
-            .compile(&mut bytes)
-            .unwrap();
-        OpCode::CONJ(Conjunction::new(OpConj::OR))
-            .compile(&mut bytes)
-            .unwrap();
-        OpCode::CONJ(Conjunction::new(OpConj::XOR))
-            .compile(&mut bytes)
-            .unwrap();
+        OpCode::CONJ(Conjunction::new(OpConj::AND)).compile(&mut bytes);
+        OpCode::CONJ(Conjunction::new(OpConj::OR)).compile(&mut bytes);
+        OpCode::CONJ(Conjunction::new(OpConj::XOR)).compile(&mut bytes);
         assert_eq!(bytes, vec![0x20, 0x21, 0x22,]);
     }
 
@@ -414,17 +420,14 @@ mod test {
                 .invert(OpInvert::NOT)
                 .indices(11, 3),
         )
-        .compile(&mut bytes)
-        .unwrap();
+        .compile(&mut bytes);
         assert_eq!(bytes, vec![0x18, 0xb3]);
     }
 
     #[test]
     fn compile_conjunction_advanced() {
         let mut bytes = Vec::<u8>::default();
-        OpCode::CONJ(Conjunction::new(OpConj::OR).invert(OpInvert::NOT))
-            .compile(&mut bytes)
-            .unwrap();
+        OpCode::CONJ(Conjunction::new(OpConj::OR).invert(OpInvert::NOT)).compile(&mut bytes);
         assert_eq!(bytes, vec![0x31]);
     }
 
