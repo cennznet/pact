@@ -162,57 +162,22 @@ impl<'a> Compiler<'a> {
             }
         };
 
-        // Check whether we need to flip the load indices
-        // to meet the load order
-        let indices = if flip {
-            OpIndices {
-                lhs: rhs_load.index,
-                rhs: lhs_load.index,
-            }
-        } else {
-            OpIndices {
-                lhs: lhs_load.index,
-                rhs: rhs_load.index,
-            }
-        };
-
-        // A flip means we need to redefine inequalities
-        let (comparator_op, invert) = if flip {
-            match comparator_op {
-                OpComp::EQ => (comparator_op, invert),
-                OpComp::IN => (comparator_op, invert),
-                OpComp::GT => {
-                    // Convert to LT
-                    let invert = match invert {
-                        OpInvert::NORMAL => OpInvert::NOT,
-                        OpInvert::NOT => OpInvert::NORMAL,
-                    };
-                    (OpComp::GTE, invert)
-                }
-                OpComp::GTE => {
-                    // Convert to LTE
-                    let invert = match invert {
-                        OpInvert::NORMAL => OpInvert::NOT,
-                        OpInvert::NOT => OpInvert::NORMAL,
-                    };
-                    (OpComp::GT, invert)
-                }
-            }
-        } else {
-            (comparator_op, invert)
-        };
-
         // Form the comparator opcode structure and push it out
         let op = OpCode {
             op_type: OpType::COMP(Comparator {
                 load: load,
                 op: comparator_op,
-                indices: indices,
+                indices: OpIndices {
+                    lhs: lhs_load.index,
+                    rhs: rhs_load.index,
+                },
             }),
             invert: invert,
         };
+
+        let op = if flip { op.flip_indices() } else { op };
         self.bytecode.push(op.into());
-        self.bytecode.push(indices.into());
+        self.bytecode.push(op.get_indices().into());
 
         // Handle conjunction if it exists
         if let Some((conjunctive, conjoined_assertion)) = &assertion.conjoined_assertion {

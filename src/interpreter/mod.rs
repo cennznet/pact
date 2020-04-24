@@ -159,6 +159,39 @@ pub enum OpConj {
 }
 
 impl OpCode {
+    pub fn flip_indices(self) -> Self {
+        match self.op_type {
+            OpType::COMP(comparator) => {
+                let indices = OpIndices {
+                    lhs: comparator.indices.rhs,
+                    rhs: comparator.indices.lhs,
+                };
+                let (comparator_op, invert) = match comparator.op {
+                    OpComp::EQ => (comparator.op, self.invert),
+                    OpComp::IN => (comparator.op, self.invert),
+                    OpComp::GT => (OpComp::GTE, self.invert.invert()),
+                    OpComp::GTE => (OpComp::GT, self.invert.invert()),
+                };
+                OpCode {
+                    op_type: OpType::COMP(Comparator {
+                        load: comparator.load,
+                        op: comparator_op,
+                        indices: indices,
+                    }),
+                    invert: invert,
+                }
+            }
+            _ => self,
+        }
+    }
+
+    pub fn get_indices(self) -> OpIndices {
+        match self.op_type {
+            OpType::COMP(comparator) => comparator.indices,
+            _ => OpIndices { lhs: 0, rhs: 0 },
+        }
+    }
+
     /// Return the next OpCode by parsing an input byte stream
     pub fn parse(stream: &mut dyn Iterator<Item = &u8>) -> Result<Option<Self>, InterpErr> {
         let op_index = stream.next();
@@ -226,6 +259,15 @@ impl OpCode {
                     invert: invert,
                 }))
             }
+        }
+    }
+}
+
+impl OpInvert {
+    fn invert(self) -> Self {
+        match self {
+            OpInvert::NORMAL => OpInvert::NOT,
+            OpInvert::NOT => OpInvert::NORMAL,
         }
     }
 }
