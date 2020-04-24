@@ -1,4 +1,4 @@
-use crate::compiler::{LoadSource, SubjectSource};
+use crate::compiler::{LoadSource, SubjectSource, CompileErr};
 use crate::interpreter::InterpErr;
 use crate::parser::ast;
 use core::convert::From;
@@ -92,6 +92,16 @@ pub enum OpConj {
 }
 
 impl OpCode {
+    // Compiles the OpCode object into one or more bytes
+    pub fn compile(self, stream: &mut Vec<u8>) -> Result<(), CompileErr> {
+        stream.push(self.into());
+        match self {
+            OpCode::COMP(comparator) => stream.push(comparator.indices.into()),
+            _ => {}
+        };
+        Ok(())
+    }
+
     /// Return the next OpCode by parsing an input byte stream
     pub fn parse(stream: &mut dyn Iterator<Item = &u8>) -> Result<Option<Self>, InterpErr> {
         let op_index = stream.next();
@@ -162,6 +172,7 @@ impl OpCode {
 }
 
 impl Comparator {
+    // Constructor for `Comparator`
     pub fn new(op: OpComp) -> Self {
         Comparator {
             load: OpLoad::INPUT_VS_USER,
@@ -171,22 +182,28 @@ impl Comparator {
         }
     }
 
+    // Update the `load` field
     pub fn load(mut self, load: OpLoad) -> Self {
         self.load = load;
         self
     }
 
+    // Update the `indices` field
     pub fn indices(mut self, lhs: u8, rhs: u8) -> Self {
         self.indices.lhs = lhs;
         self.indices.rhs = rhs;
         self
     }
 
+    // Update the `invert` field
     pub fn invert(mut self, invert: OpInvert) -> Self {
         self.invert = invert;
         self
     }
 
+    // Update the `load` field based on a subject set
+    // If lhs = `DataTable` and rhs = `Input`, we need to change sides so that
+    // lhs = `Input` and rhs = `DataTable` as per the `OpCode` encoding spec
     pub fn loads_from_subjects(mut self, lhs: SubjectSource, rhs: SubjectSource) -> Self {
         // Determine the Load Order
         let (load, flip) = match (lhs.load_source, rhs.load_source) {
@@ -196,9 +213,10 @@ impl Comparator {
             (_, _) => (OpLoad::INPUT_VS_USER, true), // Should not reach here
         };
 
-        // Form the comparator opcode structure and push it out
+        // Apply the load and indices
         self = self.load(load).indices(lhs.index, rhs.index);
 
+        // Apply a flip if neccessary
         if flip {
             self.flip_indices()
         } else {
@@ -206,6 +224,8 @@ impl Comparator {
         }
     }
 
+    // Flips the lhs and rhs indices and applies any necessary changes to the `op` and
+    // `invert` parameters to keep the expressions consistent
     pub fn flip_indices(mut self) -> Self {
         self.indices = OpIndices {
             lhs: self.indices.rhs,
@@ -222,6 +242,7 @@ impl Comparator {
         self
     }
 
+    // Applies an `ast::Imperative` to the `invert` parameter
     pub fn apply_imperative(mut self, imperative: &ast::Imperative) -> Self {
         match imperative {
             ast::Imperative::MustBe => {}
@@ -232,6 +253,7 @@ impl Comparator {
 }
 
 impl From<&ast::Comparator> for Comparator {
+    // Creates a `Comparator` from an `ast::Comparator` type
     fn from(comparator: &ast::Comparator) -> Self {
         match comparator {
             ast::Comparator::Equal => Comparator::new(OpComp::EQ),
@@ -245,6 +267,7 @@ impl From<&ast::Comparator> for Comparator {
 }
 
 impl Conjunction {
+    // Constructor for `Conjunction`
     pub fn new(op: OpConj) -> Self {
         Conjunction {
             op: op,
@@ -252,12 +275,14 @@ impl Conjunction {
         }
     }
 
+    // Update the `invert` field
     pub fn invert(mut self, invert: OpInvert) -> Self {
         self.invert = invert;
         self
     }
 }
 
+// Creates a `Conjunction` from an `ast::Conjunctive` type
 impl From<&ast::Conjunctive> for Conjunction {
     fn from(conjunctive: &ast::Conjunctive) -> Self {
         match conjunctive {
@@ -268,6 +293,7 @@ impl From<&ast::Conjunctive> for Conjunction {
 }
 
 impl OpInvert {
+    // Inverts the value of the OpInvert enum
     pub fn invert(mut self) -> Self {
         self = match self {
             OpInvert::NORMAL => OpInvert::NOT,
@@ -323,8 +349,7 @@ impl Into<u8> for OpIndices {
     }
 }
 
-/// Convert an OpCode into its u8 index.
-/// It does not encode any following parameters
+/// Convert an OpCode into its u8 bytecode
 impl Into<u8> for OpCode {
     fn into(self) -> u8 {
         match self {

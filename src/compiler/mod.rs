@@ -20,6 +20,8 @@ use crate::types::{Contract, DataTable, Numeric, PactType, StringLike};
 
 use hashbrown::HashMap;
 
+/// Indicates whether the source of a load is an `Input`
+/// or stored on the compiled `DataTable`
 #[derive(Clone, Copy)]
 pub enum LoadSource {
     Input,
@@ -64,7 +66,7 @@ pub fn compile(ir: &[ast::Node]) -> Result<Contract, CompileErr> {
     for node in ir.iter() {
         match node {
             ast::Node::InputDeclaration(idents) => {
-                if idents.len() > MAX_ENTRIES {
+                if idents.len() >= MAX_ENTRIES {
                     return Err(CompileErr::TooManyInputs);
                 }
                 for (index, ident) in idents.iter().enumerate() {
@@ -149,7 +151,6 @@ impl<'a> Compiler<'a> {
     /// Compile an assertion AST node
     fn compile_assertion(&mut self, assertion: &'a ast::Assertion) -> Result<(), CompileErr> {
         let lhs_load = self.compile_subject(&assertion.lhs_subject)?;
-        let comparator = compile_comparator(&assertion.imperative, &assertion.comparator)?;
         let rhs_load = self.compile_subject(&assertion.rhs_subject)?;
 
         match (lhs_load.load_source.clone(), rhs_load.load_source.clone()) {
@@ -159,17 +160,16 @@ impl<'a> Compiler<'a> {
             (_, _) => {}
         }
 
-        let comparator = comparator.loads_from_subjects(lhs_load, rhs_load);
-
-        let op = OpCode::COMP(comparator);
-
-        self.bytecode.push(op.into());
-        self.bytecode.push(comparator.indices.into());
+        // Build and compile comparator
+        let _ = OpCode::COMP(Comparator::from(&assertion.comparator)
+            .apply_imperative(&assertion.imperative)
+            .loads_from_subjects(lhs_load, rhs_load))
+            .compile(&mut self.bytecode)?;
 
         // Handle conjunction if it exists
         if let Some((conjunctive, conjoined_assertion)) = &assertion.conjoined_assertion {
-            self.bytecode
-                .push(compile_conjunctive(&conjunctive)?.into());
+            let _ = OpCode::CONJ(Conjunction::from(conjunctive))
+                .compile(&mut self.bytecode)?;
             self.compile_assertion(&*conjoined_assertion)?;
         }
 
@@ -213,19 +213,6 @@ impl<'a> Compiler<'a> {
             }
         }
     }
-}
-
-/// Compile a conjunction AST node
-fn compile_conjunctive(conjunctive: &ast::Conjunctive) -> Result<OpCode, CompileErr> {
-    Ok(OpCode::CONJ(Conjunction::from(conjunctive)))
-}
-
-/// Compile a comparator AST node
-fn compile_comparator(
-    imperative: &ast::Imperative,
-    comparator: &ast::Comparator,
-) -> Result<Comparator, CompileErr> {
-    Ok(Comparator::from(comparator).apply_imperative(imperative))
 }
 
 #[cfg(test)]
