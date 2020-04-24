@@ -18,7 +18,7 @@ const INDEX_RHS_SHIFT: usize = 0;
 
 /// Data structure which breaks down the anatomy of an OpCode
 #[cfg_attr(feature = "std", derive(Debug))]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum OpCode {
     COMP(Comparator),
     CONJ(Conjunction),
@@ -26,7 +26,7 @@ pub enum OpCode {
 
 /// Comparator OpCode Structure
 #[cfg_attr(feature = "std", derive(Debug))]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Comparator {
     pub load: OpLoad,
     pub op: OpComp,
@@ -36,7 +36,7 @@ pub struct Comparator {
 
 /// Conjunction OpCode Structure
 #[cfg_attr(feature = "std", derive(Debug))]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Conjunction {
     pub op: OpConj,
     pub invert: OpInvert,
@@ -44,7 +44,7 @@ pub struct Conjunction {
 
 /// Comparator OpCode Structure
 #[cfg_attr(feature = "std", derive(Debug))]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct OpIndices {
     pub lhs: u8,
     pub rhs: u8,
@@ -54,7 +54,7 @@ pub struct OpIndices {
 /// should invert the result or not
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "std", derive(Debug))]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum OpInvert {
     NORMAL,
     NOT,
@@ -64,7 +64,7 @@ pub enum OpInvert {
 /// is comparing input to datatable or input to input
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "std", derive(Debug))]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum OpLoad {
     INPUT_VS_USER,
     INPUT_VS_INPUT,
@@ -73,7 +73,7 @@ pub enum OpLoad {
 /// Enum of avaliable comparator OpCode operations
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "std", derive(Debug))]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum OpComp {
     EQ,
     GT,
@@ -84,7 +84,7 @@ pub enum OpComp {
 /// Enum of avaliable conjunction OpCode operations
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "std", derive(Debug))]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum OpConj {
     AND,
     OR,
@@ -365,5 +365,157 @@ impl Into<u8> for OpCode {
                 OP_TYPE_MASK | invert_u8 | conj_u8
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn compile_comparators_basic() {
+        let mut bytes = Vec::<u8>::default();
+        OpCode::COMP(Comparator::new(OpComp::EQ))
+            .compile(&mut bytes)
+            .unwrap();
+        OpCode::COMP(Comparator::new(OpComp::GT))
+            .compile(&mut bytes)
+            .unwrap();
+        OpCode::COMP(Comparator::new(OpComp::GTE))
+            .compile(&mut bytes)
+            .unwrap();
+        OpCode::COMP(Comparator::new(OpComp::IN))
+            .compile(&mut bytes)
+            .unwrap();
+        assert_eq!(bytes, vec![0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00,]);
+    }
+
+    #[test]
+    fn compile_conjunctions_basic() {
+        let mut bytes = Vec::<u8>::default();
+        OpCode::CONJ(Conjunction::new(OpConj::AND))
+            .compile(&mut bytes)
+            .unwrap();
+        OpCode::CONJ(Conjunction::new(OpConj::OR))
+            .compile(&mut bytes)
+            .unwrap();
+        OpCode::CONJ(Conjunction::new(OpConj::XOR))
+            .compile(&mut bytes)
+            .unwrap();
+        assert_eq!(bytes, vec![0x20, 0x21, 0x22,]);
+    }
+
+    #[test]
+    fn compile_comparator_advanced() {
+        let mut bytes = Vec::<u8>::default();
+        OpCode::COMP(
+            Comparator::new(OpComp::EQ)
+                .load(OpLoad::INPUT_VS_INPUT)
+                .invert(OpInvert::NOT)
+                .indices(11, 3),
+        )
+        .compile(&mut bytes)
+        .unwrap();
+        assert_eq!(bytes, vec![0x18, 0xb3]);
+    }
+
+    #[test]
+    fn compile_conjunction_advanced() {
+        let mut bytes = Vec::<u8>::default();
+        OpCode::CONJ(Conjunction::new(OpConj::OR).invert(OpInvert::NOT))
+            .compile(&mut bytes)
+            .unwrap();
+        assert_eq!(bytes, vec![0x31]);
+    }
+
+    #[test]
+    fn parse_comparator_basic() {
+        let mut stream = [0x00_u8, 0x00_u8].iter();
+        let op_code = OpCode::parse(&mut stream).unwrap();
+        assert_eq!(op_code, Some(OpCode::COMP(Comparator::new(OpComp::EQ))));
+    }
+
+    #[test]
+    fn parse_comparator_gt() {
+        let mut stream = [0x01_u8, 0x00_u8].iter();
+        let op_code = OpCode::parse(&mut stream).unwrap();
+        assert_eq!(op_code, Some(OpCode::COMP(Comparator::new(OpComp::GT))));
+    }
+
+    #[test]
+    fn parse_comparator_indicies() {
+        let mut stream = [0x00_u8, 0x5c_u8].iter();
+        let op_code = OpCode::parse(&mut stream).unwrap();
+        assert_eq!(
+            op_code,
+            Some(OpCode::COMP(Comparator::new(OpComp::EQ).indices(5, 12)))
+        );
+    }
+
+    #[test]
+    fn parse_comparator_advanced() {
+        let mut stream = [0x18_u8, 0x27_u8].iter();
+        let op_code = OpCode::parse(&mut stream).unwrap();
+        assert_eq!(
+            op_code,
+            Some(OpCode::COMP(
+                Comparator::new(OpComp::EQ)
+                    .invert(OpInvert::NOT)
+                    .load(OpLoad::INPUT_VS_INPUT)
+                    .indices(2, 7)
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_comparator_invalid() {
+        let mut stream = [0x07_u8, 0x00_u8].iter();
+        assert_eq!(
+            OpCode::parse(&mut stream),
+            Err(InterpErr::InvalidOpCode(0x07))
+        );
+    }
+
+    #[test]
+    fn parse_comparator_missing_indices() {
+        let mut stream = [0x00_u8].iter();
+        assert_eq!(
+            OpCode::parse(&mut stream),
+            Err(InterpErr::UnexpectedEOI("expected index"))
+        );
+    }
+
+    #[test]
+    fn parse_conjunction_basic() {
+        let mut stream = [0x20_u8].iter();
+        let op_code = OpCode::parse(&mut stream).unwrap();
+        assert_eq!(op_code, Some(OpCode::CONJ(Conjunction::new(OpConj::AND))));
+    }
+
+    #[test]
+    fn parse_conjunction_xor() {
+        let mut stream = [0x22_u8].iter();
+        let op_code = OpCode::parse(&mut stream).unwrap();
+        assert_eq!(op_code, Some(OpCode::CONJ(Conjunction::new(OpConj::XOR))));
+    }
+
+    #[test]
+    fn parse_conjunction_advanced() {
+        let mut stream = [0x31_u8].iter();
+        assert_eq!(
+            OpCode::parse(&mut stream).unwrap(),
+            Some(OpCode::CONJ(
+                Conjunction::new(OpConj::OR).invert(OpInvert::NOT)
+            ))
+        );
+    }
+
+    #[test]
+    fn parse_conjunction_invalid() {
+        let mut stream = [0x2f_u8].iter();
+        assert_eq!(
+            OpCode::parse(&mut stream),
+            Err(InterpErr::InvalidOpCode(0x2f))
+        );
     }
 }
