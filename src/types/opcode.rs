@@ -21,10 +21,7 @@ use crate::interpreter::InterpErr;
 use alloc::vec::Vec;
 
 #[cfg(feature = "compiler")]
-use crate::parser::ast;
-
-#[cfg(feature = "compiler")]
-use core::convert::From;
+pub use compiler::*;
 
 // OpCode masks
 const OP_TYPE_MASK: u8 = 0b0010_0000;
@@ -184,7 +181,7 @@ impl OpCode {
                     2 => OpConj::XOR,
                     _ => return Err(InterpErr::InvalidOpCode(*index)),
                 };
-                // form and return the comparator OpCode
+                // form and return the conjunction OpCode
                 Ok(Some(OpCode::CONJ(Conjunction {
                     op: op,
                     invert: invert,
@@ -264,31 +261,6 @@ impl Comparator {
         self.invert = invert;
         self
     }
-
-    // Applies an `ast::Imperative` to the `invert` parameter
-    #[cfg(feature = "compiler")]
-    pub fn apply_imperative(mut self, imperative: &ast::Imperative) -> Self {
-        match imperative {
-            ast::Imperative::MustBe => {}
-            ast::Imperative::MustNotBe => self.invert = !self.invert,
-        };
-        self
-    }
-}
-
-#[cfg(feature = "compiler")]
-impl From<&ast::Comparator> for Comparator {
-    // Creates a `Comparator` from an `ast::Comparator` type
-    fn from(comparator: &ast::Comparator) -> Self {
-        match comparator {
-            ast::Comparator::Equal => Comparator::new(OpComp::EQ),
-            ast::Comparator::GreaterThan => Comparator::new(OpComp::GT),
-            ast::Comparator::GreaterThanOrEqual => Comparator::new(OpComp::GTE),
-            ast::Comparator::LessThan => Comparator::new(OpComp::GTE).invert(),
-            ast::Comparator::LessThanOrEqual => Comparator::new(OpComp::GT).invert(),
-            ast::Comparator::OneOf => Comparator::new(OpComp::IN),
-        }
-    }
 }
 
 impl Conjunction {
@@ -307,13 +279,45 @@ impl Conjunction {
     }
 }
 
+// For builds which include the compiler
 #[cfg(feature = "compiler")]
-impl From<&ast::Conjunctive> for Conjunction {
-    // Creates a `Conjunction` from an `ast::Conjunctive` type
-    fn from(conjunctive: &ast::Conjunctive) -> Self {
-        match conjunctive {
-            ast::Conjunctive::And => Conjunction::new(OpConj::AND),
-            ast::Conjunctive::Or => Conjunction::new(OpConj::OR),
+mod compiler {
+    use super::*;
+    use crate::parser::ast;
+    use core::convert::From;
+
+    impl Comparator {
+        // Applies an `ast::Imperative` to the `invert` parameter
+        pub fn apply_imperative(mut self, imperative: &ast::Imperative) -> Self {
+            match imperative {
+                ast::Imperative::MustBe => {}
+                ast::Imperative::MustNotBe => self.invert = !self.invert,
+            };
+            self
+        }
+    }
+
+    impl From<&ast::Comparator> for Comparator {
+        // Creates a `Comparator` from an `ast::Comparator` type
+        fn from(comparator: &ast::Comparator) -> Self {
+            match comparator {
+                ast::Comparator::Equal => Comparator::new(OpComp::EQ),
+                ast::Comparator::GreaterThan => Comparator::new(OpComp::GT),
+                ast::Comparator::GreaterThanOrEqual => Comparator::new(OpComp::GTE),
+                ast::Comparator::LessThan => Comparator::new(OpComp::GTE).invert(),
+                ast::Comparator::LessThanOrEqual => Comparator::new(OpComp::GT).invert(),
+                ast::Comparator::OneOf => Comparator::new(OpComp::IN),
+            }
+        }
+    }
+
+    impl From<&ast::Conjunctive> for Conjunction {
+        // Creates a `Conjunction` from an `ast::Conjunctive` type
+        fn from(conjunctive: &ast::Conjunctive) -> Self {
+            match conjunctive {
+                ast::Conjunctive::And => Conjunction::new(OpConj::AND),
+                ast::Conjunctive::Or => Conjunction::new(OpConj::OR),
+            }
         }
     }
 }
