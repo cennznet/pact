@@ -20,7 +20,7 @@
 use crate::types::PactType;
 
 pub use crate::types::opcode::{
-    Comparator, Conjunction, OpCode, OpComp, OpConj, OpIndices, OpInvert, OpLoad,
+    Comparator, Conjunction, OpCode, OpComp, OpConj, OpIndices, OpLoad,
 };
 
 /// Interpret some pact byte code (`source`) with input data registers (`input_data`) and
@@ -99,14 +99,15 @@ fn eval_comparator(
     }?;
 
     // Apply inversion if required
-    match comparator.invert {
-        OpInvert::NOT => Ok(!value),
-        _ => Ok(value),
+    if comparator.invert {
+        Ok(!value)
+    } else {
+        Ok(value)
     }
 }
 
 /// Evaluate a conjunction OpCode given an LHS and RHS boolean
-fn eval_conjunction(conjunction: &Conjunction, lhs: &bool, rhs: bool) -> Result<bool, InterpErr> {
+fn eval_conjunction(conjunction: &Conjunction, lhs: bool, rhs: bool) -> Result<bool, InterpErr> {
     let value = match conjunction.op {
         OpConj::AND => lhs & rhs,
         OpConj::OR => lhs | rhs,
@@ -114,10 +115,11 @@ fn eval_conjunction(conjunction: &Conjunction, lhs: &bool, rhs: bool) -> Result<
     };
 
     // Apply inversion if required
-    Ok(match conjunction.invert {
-        OpInvert::NORMAL => value,
-        OpInvert::NOT => !value,
-    })
+    if conjunction.invert {
+        Ok(!value)
+    } else {
+        Ok(value)
+    }
 }
 
 /// The pact interpreter
@@ -172,7 +174,7 @@ impl<'a> Interpreter<'a> {
                         last_assertion,
                         conjunction,
                     } => {
-                        result = eval_conjunction(conjunction, last_assertion, result)?;
+                        result = eval_conjunction(conjunction, *last_assertion, result)?;
                     }
                     _ => {}
                 };

@@ -19,7 +19,7 @@
 #![cfg(test)]
 use pact::{
     interpreter::{self, InterpErr},
-    interpreter::{Comparator, Conjunction, OpCode, OpComp, OpConj, OpInvert, OpLoad},
+    interpreter::{Comparator, Conjunction, OpCode, OpComp, OpConj, OpLoad},
     types::{Numeric, PactType, StringLike},
 };
 
@@ -53,7 +53,7 @@ fn it_does_a_not_eq_comparison() {
         PactType::Numeric(Numeric(234)),
     ];
     let user = [PactType::Numeric(Numeric(123))];
-    let neq = OpCode::COMP(Comparator::new(OpComp::EQ).invert(OpInvert::NOT));
+    let neq = OpCode::COMP(Comparator::new(OpComp::EQ).invert());
 
     let result = interpreter::interpret(&input, &user, &[neq.into(), 0x00]);
     assert_eq!(result, Ok(false));
@@ -69,7 +69,7 @@ fn it_does_a_lt_comparison_ok() {
         &[PactType::Numeric(Numeric(100))],
         &[
             // INPUT(1) < USER(1)
-            OpCode::COMP(Comparator::new(OpComp::GTE).invert(OpInvert::NOT)).into(),
+            OpCode::COMP(Comparator::new(OpComp::GTE).invert()).into(),
             0x00,
         ],
     );
@@ -84,7 +84,7 @@ fn it_does_an_lte_comparison_ok() {
         &[PactType::Numeric(Numeric(100))],
         &[
             // INPUT(1) <= USER(1)
-            OpCode::COMP(Comparator::new(OpComp::GT).invert(OpInvert::NOT)).into(),
+            OpCode::COMP(Comparator::new(OpComp::GT).invert()).into(),
             0x00,
         ],
     );
@@ -141,8 +141,8 @@ fn it_fails_with_bad_type_operation_on_stringlike() {
     let bad_op_codes = vec![
         OpCode::COMP(Comparator::new(OpComp::GTE)).into(),
         OpCode::COMP(Comparator::new(OpComp::GT)).into(),
-        OpCode::COMP(Comparator::new(OpComp::GTE).invert(OpInvert::NOT)).into(),
-        OpCode::COMP(Comparator::new(OpComp::GT).invert(OpInvert::NOT)).into(),
+        OpCode::COMP(Comparator::new(OpComp::GTE).invert()).into(),
+        OpCode::COMP(Comparator::new(OpComp::GT).invert()).into(),
         OpCode::COMP(Comparator::new(OpComp::IN)).into(),
     ];
     for op in bad_op_codes.into_iter() {
@@ -428,7 +428,7 @@ fn it_does_an_lt_comparison_evaluates_false() {
         &[PactType::Numeric(Numeric(100))],
         &[PactType::Numeric(Numeric(99))],
         &[
-            OpCode::COMP(Comparator::new(OpComp::GTE).invert(OpInvert::NOT)).into(),
+            OpCode::COMP(Comparator::new(OpComp::GTE).invert()).into(),
             0x00,
         ],
     );
@@ -442,7 +442,7 @@ fn it_does_an_lte_comparison_evaluates_false() {
         &[PactType::Numeric(Numeric(101))],
         &[PactType::Numeric(Numeric(100))],
         &[
-            OpCode::COMP(Comparator::new(OpComp::GT).invert(OpInvert::NOT)).into(),
+            OpCode::COMP(Comparator::new(OpComp::GT).invert()).into(),
             0x00,
         ],
     );
@@ -574,7 +574,7 @@ fn it_does_a_not_in_comparison() {
         &input_data,
         &user_data,
         &[
-            OpCode::COMP(Comparator::new(OpComp::IN).invert(OpInvert::NOT)).into(),
+            OpCode::COMP(Comparator::new(OpComp::IN).invert()).into(),
             0x00,
         ],
     );
@@ -584,7 +584,7 @@ fn it_does_a_not_in_comparison() {
         &input_data,
         &user_data,
         &[
-            OpCode::COMP(Comparator::new(OpComp::IN).invert(OpInvert::NOT)).into(),
+            OpCode::COMP(Comparator::new(OpComp::IN).invert()).into(),
             0x10,
         ],
     );
@@ -601,8 +601,8 @@ fn it_fails_for_invalid_list_operators() {
 
     let invalid_code_set = [
         OpCode::COMP(Comparator::new(OpComp::EQ)),
-        OpCode::COMP(Comparator::new(OpComp::GT).invert(OpInvert::NOT)),
-        OpCode::COMP(Comparator::new(OpComp::GTE).invert(OpInvert::NOT)),
+        OpCode::COMP(Comparator::new(OpComp::GT).invert()),
+        OpCode::COMP(Comparator::new(OpComp::GTE).invert()),
         OpCode::COMP(Comparator::new(OpComp::GT)),
         OpCode::COMP(Comparator::new(OpComp::GTE)),
     ];

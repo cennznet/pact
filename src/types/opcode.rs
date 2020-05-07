@@ -1,3 +1,22 @@
+// Copyright 2019 Centrality Investments Limited
+// This file is part of Pact.
+//
+// Licensed under the LGPL, Version 3.0 (the "License");
+// you may not use this file except in compliance with the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// You should have received a copy of the GNU General Public License
+// along with Pact. If not, see:
+//   <https://centrality.ai/licenses/gplv3.txt>
+//   <https://centrality.ai/licenses/lgplv3.txt>
+
+//!
+//! Pact OpCodes
+//!
 use crate::interpreter::InterpErr;
 use alloc::vec::Vec;
 
@@ -49,7 +68,7 @@ pub struct Comparator {
     pub load: OpLoad,
     pub op: OpComp,
     pub indices: OpIndices,
-    pub invert: OpInvert,
+    pub invert: bool,
 }
 
 /// Conjunction OpCode Structure
@@ -57,7 +76,7 @@ pub struct Comparator {
 #[derive(Clone, Copy, PartialEq)]
 pub struct Conjunction {
     pub op: OpConj,
-    pub invert: OpInvert,
+    pub invert: bool,
 }
 
 /// Comparator OpCode Structure
@@ -66,16 +85,6 @@ pub struct Conjunction {
 pub struct OpIndices {
     pub lhs: u8,
     pub rhs: u8,
-}
-
-/// Enum to determine whether a comparator/conjunction
-/// should invert the result or not
-#[allow(non_camel_case_types)]
-#[cfg_attr(feature = "std", derive(Debug))]
-#[derive(Clone, Copy, PartialEq)]
-pub enum OpInvert {
-    NORMAL,
-    NOT,
 }
 
 /// Enum to determine whether a comparator OpCode
@@ -130,10 +139,7 @@ impl OpCode {
         let index = op_index.unwrap();
 
         // Check if the invert Bit is Set
-        let invert = match index & OP_INVERT_MASK {
-            0 => OpInvert::NORMAL,
-            _ => OpInvert::NOT,
-        };
+        let invert = (index & OP_INVERT_MASK) == OP_INVERT_MASK;
 
         // Check the Type of OpCode (0 ? comparator : conjunction)
         match index & OP_TYPE_MASK {
@@ -195,7 +201,7 @@ impl Comparator {
             load: OpLoad::INPUT_VS_USER,
             op: op,
             indices: OpIndices { lhs: 0, rhs: 0 },
-            invert: OpInvert::NORMAL,
+            invert: false,
         }
     }
 
@@ -213,8 +219,8 @@ impl Comparator {
     }
 
     // Update the `invert` field
-    pub fn invert(mut self, invert: OpInvert) -> Self {
-        self.invert = invert;
+    pub fn invert(mut self) -> Self {
+        self.invert = true;
         self
     }
 
@@ -251,8 +257,8 @@ impl Comparator {
         let (op, invert) = match self.op {
             OpComp::EQ => (self.op, self.invert),
             OpComp::IN => (self.op, self.invert),
-            OpComp::GT => (OpComp::GTE, self.invert.invert()),
-            OpComp::GTE => (OpComp::GT, self.invert.invert()),
+            OpComp::GT => (OpComp::GTE, !self.invert),
+            OpComp::GTE => (OpComp::GT, !self.invert),
         };
         self.op = op;
         self.invert = invert;
@@ -264,7 +270,7 @@ impl Comparator {
     pub fn apply_imperative(mut self, imperative: &ast::Imperative) -> Self {
         match imperative {
             ast::Imperative::MustBe => {}
-            ast::Imperative::MustNotBe => self.invert = self.invert.invert(),
+            ast::Imperative::MustNotBe => self.invert = !self.invert,
         };
         self
     }
@@ -278,8 +284,8 @@ impl From<&ast::Comparator> for Comparator {
             ast::Comparator::Equal => Comparator::new(OpComp::EQ),
             ast::Comparator::GreaterThan => Comparator::new(OpComp::GT),
             ast::Comparator::GreaterThanOrEqual => Comparator::new(OpComp::GTE),
-            ast::Comparator::LessThan => Comparator::new(OpComp::GTE).invert(OpInvert::NOT),
-            ast::Comparator::LessThanOrEqual => Comparator::new(OpComp::GT).invert(OpInvert::NOT),
+            ast::Comparator::LessThan => Comparator::new(OpComp::GTE).invert(),
+            ast::Comparator::LessThanOrEqual => Comparator::new(OpComp::GT).invert(),
             ast::Comparator::OneOf => Comparator::new(OpComp::IN),
         }
     }
@@ -290,13 +296,13 @@ impl Conjunction {
     pub fn new(op: OpConj) -> Self {
         Conjunction {
             op: op,
-            invert: OpInvert::NORMAL,
+            invert: false,
         }
     }
 
     // Update the `invert` field
-    pub fn invert(mut self, invert: OpInvert) -> Self {
-        self.invert = invert;
+    pub fn invert(mut self) -> Self {
+        self.invert = true;
         self
     }
 }
@@ -308,26 +314,6 @@ impl From<&ast::Conjunctive> for Conjunction {
         match conjunctive {
             ast::Conjunctive::And => Conjunction::new(OpConj::AND),
             ast::Conjunctive::Or => Conjunction::new(OpConj::OR),
-        }
-    }
-}
-
-impl OpInvert {
-    // Inverts the value of the OpInvert enum
-    pub fn invert(mut self) -> Self {
-        self = match self {
-            OpInvert::NORMAL => OpInvert::NOT,
-            OpInvert::NOT => OpInvert::NORMAL,
-        };
-        self
-    }
-}
-
-impl Into<u8> for OpInvert {
-    fn into(self) -> u8 {
-        match self {
-            OpInvert::NORMAL => 0,
-            OpInvert::NOT => OP_INVERT_MASK,
         }
     }
 }
@@ -374,13 +360,13 @@ impl Into<u8> for OpCode {
     fn into(self) -> u8 {
         match self {
             OpCode::COMP(comp) => {
-                let invert_u8: u8 = comp.invert.into();
+                let invert_u8: u8 = if comp.invert { OP_INVERT_MASK } else { 0 };
                 let load_u8: u8 = comp.load.into();
                 let comp_u8: u8 = comp.op.into();
                 invert_u8 | load_u8 | comp_u8
             }
             OpCode::CONJ(conj) => {
-                let invert_u8: u8 = conj.invert.into();
+                let invert_u8: u8 = if conj.invert { OP_INVERT_MASK } else { 0 };
                 let conj_u8: u8 = conj.op.into();
                 OP_TYPE_MASK | invert_u8 | conj_u8
             }
@@ -417,7 +403,7 @@ mod test {
         OpCode::COMP(
             Comparator::new(OpComp::EQ)
                 .load(OpLoad::INPUT_VS_INPUT)
-                .invert(OpInvert::NOT)
+                .invert()
                 .indices(11, 3),
         )
         .compile(&mut bytes);
@@ -427,7 +413,7 @@ mod test {
     #[test]
     fn compile_conjunction_advanced() {
         let mut bytes = Vec::<u8>::default();
-        OpCode::CONJ(Conjunction::new(OpConj::OR).invert(OpInvert::NOT)).compile(&mut bytes);
+        OpCode::CONJ(Conjunction::new(OpConj::OR).invert()).compile(&mut bytes);
         assert_eq!(bytes, vec![0x31]);
     }
 
@@ -463,7 +449,7 @@ mod test {
             op_code,
             Some(OpCode::COMP(
                 Comparator::new(OpComp::EQ)
-                    .invert(OpInvert::NOT)
+                    .invert()
                     .load(OpLoad::INPUT_VS_INPUT)
                     .indices(2, 7)
             ))
@@ -507,9 +493,7 @@ mod test {
         let mut stream = [0x31_u8].iter();
         assert_eq!(
             OpCode::parse(&mut stream).unwrap(),
-            Some(OpCode::CONJ(
-                Conjunction::new(OpConj::OR).invert(OpInvert::NOT)
-            ))
+            Some(OpCode::CONJ(Conjunction::new(OpConj::OR).invert()))
         );
     }
 
