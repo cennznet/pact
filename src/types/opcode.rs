@@ -38,7 +38,7 @@ const INDEX_RHS_SHIFT: usize = 0;
 
 /// Indicates whether the source of a load is an `Input`
 /// or stored on the compiled `DataTable`
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum LoadSource {
     Input,
     DataTable,

@@ -139,11 +139,10 @@ impl<'a> Compiler<'a> {
         let lhs_load = self.compile_subject(&assertion.lhs_subject)?;
         let rhs_load = self.compile_subject(&assertion.rhs_subject)?;
 
-        match (lhs_load.load_source.clone(), rhs_load.load_source.clone()) {
-            (LoadSource::DataTable, LoadSource::DataTable) => {
-                return Err(CompileErr::InvalidCompare)
-            }
-            (_, _) => {}
+        if lhs_load.load_source == LoadSource::DataTable
+            && rhs_load.load_source == LoadSource::DataTable
+        {
+            return Err(CompileErr::InvalidCompare);
         }
 
         // Build and compile comparator
