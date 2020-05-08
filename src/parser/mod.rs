@@ -118,7 +118,13 @@ fn build_assertion(pair: pest::iterators::Pair<Rule>) -> ast::Assertion {
         None
     };
 
-    ast::Assertion(lhs, imperative, comparator, rhs, conjoined_assertion)
+    ast::Assertion {
+        lhs_subject: lhs,
+        imperative: imperative,
+        comparator: comparator,
+        rhs_subject: rhs,
+        conjoined_assertion: conjoined_assertion,
+    }
 }
 
 /// Build a `value` node from a pest input pair

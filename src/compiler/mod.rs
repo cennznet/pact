@@ -14,20 +14,28 @@
 //   <https://centrality.ai/licenses/gplv3.txt>
 //   <https://centrality.ai/licenses/lgplv3.txt>
 
-use crate::interpreter::OpCode;
 use crate::parser::ast;
+use crate::types::opcode::{Comparator, Conjunction, LoadSource, OpCode, SubjectSource};
 use crate::types::{Contract, DataTable, Numeric, PactType, StringLike};
 
 use hashbrown::HashMap;
 
+const MAX_ENTRIES: usize = 16;
+
 /// Compilation error
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CompileErr {
     /// The identifier used is not declared
     UndeclaredVar(ast::Identifier),
     /// A parameter with the same identifier has already been declared
     Redeclared,
     InvalidListElement,
+    /// Comparing user data table entries is not valid
+    InvalidCompare,
+    /// Data table is full
+    DataTableFull,
+    /// Too Many Input arguments
+    TooManyInputs,
 }
 
 /// Compile a pact contract AST into bytecode
@@ -44,6 +52,9 @@ pub fn compile(ir: &[ast::Node]) -> Result<Contract, CompileErr> {
     for node in ir.iter() {
         match node {
             ast::Node::InputDeclaration(idents) => {
+                if idents.len() >= MAX_ENTRIES {
+                    return Err(CompileErr::TooManyInputs);
+                }
                 for (index, ident) in idents.iter().enumerate() {
                     compiler
                         .input_var_index
@@ -82,7 +93,7 @@ pub fn compile(ir: &[ast::Node]) -> Result<Contract, CompileErr> {
                         PactType::List(list)
                     }
                 };
-                compiler.data_table.push(v)
+                compiler.push_to_datatable(v)?;
             }
         }
     }
@@ -114,34 +125,37 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    fn push_to_datatable(&mut self, value: PactType<'a>) -> Result<(), CompileErr> {
+        if self.data_table.len() >= MAX_ENTRIES {
+            Err(CompileErr::DataTableFull)
+        } else {
+            self.data_table.push(value);
+            Ok(())
+        }
+    }
+
     /// Compile an assertion AST node
     fn compile_assertion(&mut self, assertion: &'a ast::Assertion) -> Result<(), CompileErr> {
-        let comparator_op = compile_comparator(&assertion.2)?;
-        self.bytecode.push(comparator_op.into());
+        let lhs_load = self.compile_subject(&assertion.lhs_subject)?;
+        let rhs_load = self.compile_subject(&assertion.rhs_subject)?;
 
-        let lhs_load_op = self.compile_subject(&assertion.0)?;
-        match lhs_load_op {
-            OpCode::LD_INPUT(index) | OpCode::LD_USER(index) => {
-                self.bytecode.push(lhs_load_op.into());
-                self.bytecode.push(index);
-            }
-            _ => panic!("unreachable"),
-        };
+        if lhs_load.load_source == LoadSource::DataTable
+            && rhs_load.load_source == LoadSource::DataTable
+        {
+            return Err(CompileErr::InvalidCompare);
+        }
 
-        // TODO: Imperative is ignored for now. In future it will set/flip the truthiness of the comparator op
+        // Build and compile comparator
+        let _ = OpCode::COMP(
+            Comparator::from(&assertion.comparator)
+                .apply_imperative(&assertion.imperative)
+                .loads_from_subjects(lhs_load, rhs_load),
+        )
+        .compile(&mut self.bytecode);
 
-        let rhs_load_op = self.compile_subject(&assertion.3)?;
-        match rhs_load_op {
-            OpCode::LD_INPUT(index) | OpCode::LD_USER(index) => {
-                self.bytecode.push(rhs_load_op.into());
-                self.bytecode.push(index);
-            }
-            _ => panic!("unreachable"),
-        };
-
-        if let Some((conjunctive, conjoined_assertion)) = &assertion.4 {
-            self.bytecode
-                .push(compile_conjunctive(&conjunctive)?.into());
+        // Handle conjunction if it exists
+        if let Some((conjunctive, conjoined_assertion)) = &assertion.conjoined_assertion {
+            let _ = OpCode::CONJ(Conjunction::from(conjunctive)).compile(&mut self.bytecode);
             self.compile_assertion(&*conjoined_assertion)?;
         }
 
@@ -149,7 +163,7 @@ impl<'a> Compiler<'a> {
     }
 
     /// Compile a subject AST node
-    fn compile_subject(&mut self, subject: &'a ast::Subject) -> Result<OpCode, CompileErr> {
+    fn compile_subject(&mut self, subject: &'a ast::Subject) -> Result<SubjectSource, CompileErr> {
         // `subject` could be a literal value or an identifier
         // A literal value should be stored in the user data table
         // An identifier should have been declared or it is an error
@@ -161,41 +175,30 @@ impl<'a> Compiler<'a> {
                     ast::Value::StringLike(s) => PactType::StringLike(StringLike(s.as_bytes())),
                     ast::Value::List(_) => panic!("Invalid subject"),
                 };
-                self.data_table.push(v);
-                Ok(OpCode::LD_USER((self.data_table.len() as u8) - 1))
+                self.push_to_datatable(v)?;
+                Ok(SubjectSource {
+                    load_source: LoadSource::DataTable,
+                    index: (self.data_table.len() as u8) - 1,
+                })
             }
             ast::Subject::Identifier(ident) => {
                 // Try lookup this var `ident` in the known input and user data tables
                 if let Some(index) = self.input_var_index.get(ident) {
-                    return Ok(OpCode::LD_INPUT(*index));
+                    return Ok(SubjectSource {
+                        load_source: LoadSource::Input,
+                        index: *index,
+                    });
                 }
                 if let Some(index) = self.user_var_index.get(ident) {
-                    return Ok(OpCode::LD_USER(*index));
+                    return Ok(SubjectSource {
+                        load_source: LoadSource::DataTable,
+                        index: *index,
+                    });
                 }
                 Err(CompileErr::UndeclaredVar(ident.to_string()))
             }
         }
     }
-}
-
-/// Compile a conjunction AST node
-fn compile_conjunctive(conjunctive: &ast::Conjunctive) -> Result<OpCode, CompileErr> {
-    Ok(match conjunctive {
-        ast::Conjunctive::And => OpCode::AND,
-        ast::Conjunctive::Or => OpCode::OR,
-    })
-}
-
-/// Compile a comparator AST node
-fn compile_comparator(comparator: &ast::Comparator) -> Result<OpCode, CompileErr> {
-    Ok(match comparator {
-        ast::Comparator::Equal => OpCode::EQ,
-        ast::Comparator::GreaterThan => OpCode::GT,
-        ast::Comparator::GreaterThanOrEqual => OpCode::GTE,
-        ast::Comparator::LessThan => OpCode::LT,
-        ast::Comparator::LessThanOrEqual => OpCode::LTE,
-        ast::Comparator::OneOf => OpCode::IN,
-    })
 }
 
 #[cfg(test)]

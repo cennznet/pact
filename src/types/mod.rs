@@ -20,6 +20,7 @@
 mod base;
 mod contract;
 mod data_table;
+pub mod opcode;
 mod type_cast;
 
 // Create nice top level exports
